@@ -1,0 +1,26 @@
+{
+  "name": "cmux-coder",
+  "version": "0.1.0",
+  "description": "CLI for integrating Cmux with Coder remote dev environments",
+  "type": "module",
+  "bin": {
+    "cmux-coder": "./bin/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --compile --outfile dist/cmux-coder",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.1.0",
+    "citty": "^0.2.1",
+    "consola": "^3.4.2",
+    "picocolors": "^1.1.1"
+  }
+}
