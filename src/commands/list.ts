@@ -7,54 +7,11 @@ import {
   getCoderUrl,
   dashboardUrl,
   workspaceStatus,
-  relativeTime,
   openInBrowser,
   sshIntoWorkspace,
   type CoderWorkspace,
 } from "../lib/coder.ts";
-
-function statusBadge(ws: CoderWorkspace): string {
-  const s = workspaceStatus(ws);
-  switch (s) {
-    case "running":
-      return pc.green("● running");
-    case "stopped":
-      return pc.dim("○ stopped");
-    case "starting":
-      return pc.yellow("◐ starting");
-    case "stopping":
-      return pc.yellow("◑ stopping");
-    case "failed":
-      return pc.red("✖ failed");
-    default:
-      return pc.dim(`? ${s}`);
-  }
-}
-
-function healthBadge(ws: CoderWorkspace): string {
-  return ws.health?.healthy ? pc.green("healthy") : pc.red("unhealthy");
-}
-
-function formatWorkspaceLabel(ws: CoderWorkspace): string {
-  const parts = [
-    pc.bold(ws.latest_build.template_version_name),
-    statusBadge(ws),
-    healthBadge(ws),
-    pc.dim(`built ${relativeTime(ws.latest_build.created_at)} ago`),
-    pc.dim(ws.name),
-  ];
-  return parts.join("  ");
-}
-
-function fuzzyMatch(query: string, target: string): boolean {
-  const q = query.toLowerCase();
-  const t = target.toLowerCase();
-  let qi = 0;
-  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
-    if (t[ti] === q[qi]) qi++;
-  }
-  return qi === q.length;
-}
+import { formatWorkspaceLabel, fuzzyMatch } from "../lib/workspace-picker.ts";
 
 export const listCommand = defineCommand({
   meta: {

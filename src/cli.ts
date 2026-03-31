@@ -5,6 +5,7 @@ import { version } from "../package.json";
 import { statusCommand } from "./commands/status.ts";
 import { connectCommand } from "./commands/connect.ts";
 import { listCommand } from "./commands/list.ts";
+import { sshCommand } from "./commands/ssh.ts";
 
 const main = defineCommand({
   meta: {
@@ -21,6 +22,7 @@ const main = defineCommand({
     status: statusCommand,
     connect: connectCommand,
     list: listCommand,
+    ssh: sshCommand,
   },
 });
 
