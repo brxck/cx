@@ -6,6 +6,11 @@ import {
   relativeTime,
   type CoderWorkspace,
 } from "./coder.ts";
+import {
+  type CmuxWorkspace,
+  listWorkspaces as listCmuxWorkspaces,
+} from "./cmux.ts";
+import { getAllLayouts, type LayoutEntry } from "./store.ts";
 
 function statusBadge(ws: CoderWorkspace): string {
   const s = workspaceStatus(ws);
@@ -102,4 +107,49 @@ export async function pickWorkspace(opts?: {
   if (p.isCancel(selected)) return null;
 
   return filtered.find((w) => w.name === selected) ?? null;
+}
+
+export function formatLayoutLabel(layout: LayoutEntry, cmuxRefs: Set<string>): string {
+  const active = cmuxRefs.has(layout.cmux_id);
+  const status = active ? pc.green("● active") : pc.dim("○ closed");
+  return `${pc.bold(layout.name)}  ${status}  ${pc.dim(layout.coder_ws)}  ${layout.template ? pc.dim(layout.template) + "  " : ""}${pc.dim(layout.type)}`;
+}
+
+/**
+ * Show an interactive picker for layouts, joined with live Cmux workspace status.
+ * Returns the selected layout or null if cancelled.
+ */
+export async function pickLayout(opts?: {
+  layouts?: LayoutEntry[];
+  message?: string;
+}): Promise<LayoutEntry | null> {
+  const layouts = opts?.layouts ?? getAllLayouts();
+  if (layouts.length === 0) return null;
+
+  let cmuxWorkspaces: CmuxWorkspace[] = [];
+  try {
+    cmuxWorkspaces = await listCmuxWorkspaces();
+  } catch {}
+
+  const cmuxRefs = new Set(cmuxWorkspaces.map((w) => w.ref));
+
+  // Sort: active first, then by last active time (already sorted from store)
+  const sorted = [...layouts].sort((a, b) => {
+    const aActive = cmuxRefs.has(a.cmux_id) ? 0 : 1;
+    const bActive = cmuxRefs.has(b.cmux_id) ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    return 0; // preserve store ordering (by active_at DESC)
+  });
+
+  const choice = await p.select({
+    message: opts?.message ?? "Select a layout",
+    options: sorted.map((l) => ({
+      value: l.name,
+      label: formatLayoutLabel(l, cmuxRefs),
+    })),
+  });
+
+  if (p.isCancel(choice)) return null;
+
+  return sorted.find((l) => l.name === choice) ?? null;
 }

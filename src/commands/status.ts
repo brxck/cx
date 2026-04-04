@@ -9,9 +9,11 @@ import {
 } from "../lib/coder.ts";
 import {
   type CmuxWorkspace,
+  type SidebarState,
   listWorkspaces as listCmuxWorkspaces,
   ping as cmuxPing,
   sidebarState,
+  parseSidebarState,
 } from "../lib/cmux.ts";
 import {
   type LayoutEntry,
@@ -20,16 +22,6 @@ import {
 } from "../lib/store.ts";
 
 // ── Types ──
-
-interface SidebarState {
-  gitBranch: string | null;
-  gitDirty: boolean;
-  pr: string | null;
-  prUrl: string | null;
-  claudeStatus: string | null;
-  cwd: string | null;
-  ports: string | null;
-}
 
 interface LayoutStatus {
   name: string;
@@ -56,53 +48,6 @@ interface LayoutStatus {
 }
 
 // ── Helpers ──
-
-function parseSidebarState(output: string): SidebarState {
-  const state: SidebarState = {
-    gitBranch: null,
-    gitDirty: false,
-    pr: null,
-    prUrl: null,
-    claudeStatus: null,
-    cwd: null,
-    ports: null,
-  };
-
-  for (const line of output.split("\n")) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("git_branch=")) {
-      const value = trimmed.slice("git_branch=".length);
-      if (value !== "none") {
-        const parts = value.split(" ");
-        state.gitBranch = parts[0] ?? null;
-        state.gitDirty = parts[1] === "dirty";
-      }
-    } else if (trimmed.startsWith("cwd=")) {
-      const value = trimmed.slice("cwd=".length);
-      if (value !== "none") state.cwd = value;
-    } else if (trimmed.startsWith("pr=")) {
-      const value = trimmed.slice("pr=".length);
-      if (value !== "none") {
-        // pr=#168 merged https://...
-        const parts = value.split(" ");
-        const num = parts[0];
-        const prStatus = parts[1];
-        state.pr = num && prStatus ? `${num} ${prStatus}` : num ?? null;
-        if (parts[2]?.startsWith("http")) state.prUrl = parts[2];
-      }
-    } else if (trimmed.startsWith("ports=")) {
-      const value = trimmed.slice("ports=".length);
-      if (value !== "none") state.ports = value;
-    } else if (trimmed.startsWith("claude_code=")) {
-      // claude_code=Running icon=bolt.fill color=#4C8DFF
-      const value = trimmed.slice("claude_code=".length).split(" ")[0]!;
-      if (value !== "none") state.claudeStatus = value;
-    }
-  }
-
-  return state;
-}
 
 async function detectPortForwards(): Promise<Map<string, string[]>> {
   const map = new Map<string, string[]>();

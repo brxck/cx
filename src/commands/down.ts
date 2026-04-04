@@ -5,6 +5,7 @@ import { stopWorkspace } from "../lib/coder.ts";
 import * as cmux from "../lib/cmux.ts";
 import { removeCmuxJsonEntry } from "../lib/templates.ts";
 import { getAllLayouts, getLayout, getLayoutsByPath, removeLayout, type LayoutEntry } from "../lib/store.ts";
+import { pickLayout } from "../lib/workspace-picker.ts";
 
 export const downCommand = defineCommand({
   meta: {
@@ -99,32 +100,17 @@ async function resolveLayout(name: string | undefined): Promise<LayoutEntry | nu
     process.exit(0);
   }
 
-  // Join with live cmux workspaces to show status
-  let cmuxWorkspaces: cmux.CmuxWorkspace[] = [];
-  try {
-    cmuxWorkspaces = await cmux.listWorkspaces();
-  } catch {}
-
-  const cmuxRefs = new Set(cmuxWorkspaces.map((w) => w.ref));
-
-  const choice = await p.select({
+  const selected = await pickLayout({
+    layouts,
     message: "Select a layout to tear down",
-    options: layouts.map((l) => {
-      const active = cmuxRefs.has(l.cmux_id);
-      const status = active ? pc.green("● active") : pc.dim("○ closed");
-      return {
-        value: l.name,
-        label: `${pc.bold(l.name)}  ${status}  ${pc.dim(l.coder_ws)}  ${pc.dim(l.type)}`,
-      };
-    }),
   });
 
-  if (p.isCancel(choice)) {
+  if (!selected) {
     p.cancel("Cancelled.");
     process.exit(0);
   }
 
-  return layouts.find((l) => l.name === choice) ?? null;
+  return selected;
 }
 
 async function resolveShouldStop(

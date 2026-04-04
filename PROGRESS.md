@@ -17,8 +17,8 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `coder logs [workspace]` | Not started | |
 | `attach [workspace]` | Not started | |
 | `detach [layout]` | Not started | |
-| `activate [layout]` | Not started | |
-| `find <query>` | Not started | |
+| `activate [layout]` | Done | Exact name, fuzzy match, or interactive picker. Switches Cmux workspace and touches store. |
+| `find <query>` | Done | Fuzzy search across name/coder_ws/template/branch/path, `--branch` with live sidebar state, `--path` flag. Activates on selection. |
 | `restore` | Not started | |
 
 ## Features
@@ -45,11 +45,11 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 
 | Module | Purpose |
 |---|---|
-| `src/lib/cmux.ts` | Cmux CLI wrapper: workspace/pane/surface CRUD, input, notifications, sidebar state, list-workspaces parsing |
+| `src/lib/cmux.ts` | Cmux CLI wrapper: workspace/pane/surface CRUD, input, notifications, sidebar state with `SidebarState`/`parseSidebarState`, list-workspaces parsing |
 | `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
 | `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions, v2 schema |
 | `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs |
-| `src/lib/workspace-picker.ts` | Shared interactive workspace picker with fuzzy matching and status badges |
+| `src/lib/workspace-picker.ts` | Shared interactive Coder workspace picker and layout picker (`pickLayout`) with fuzzy matching and status badges |
 | `src/lib/session-names.ts` | Generates session names from PNW town names, avoiding duplicates |
 
 ## Infrastructure
