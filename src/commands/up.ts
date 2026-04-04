@@ -11,18 +11,14 @@ import {
   ensureSshConfig,
   type CoderWorkspace,
 } from "../lib/coder.ts";
-import * as cmux from "../lib/cmux.ts";
 import {
   resolveTemplate as resolveTemplateFromLib,
   generateCmuxCommand,
   writeCmuxJson,
-  isSplitNode,
-  isPaneNode,
   type TemplateConfig,
-  type LayoutNode,
-  type PaneNode,
 } from "../lib/templates.ts";
 import { saveLayout } from "../lib/store.ts";
+import { buildCmuxLayout, startPortForwarding } from "../lib/layout-builder.ts";
 
 export const upCommand = defineCommand({
   meta: {
@@ -157,135 +153,3 @@ async function ensureCoderWorkspace(
   p.log.success(`Workspace ${pc.bold(name)} is ready`);
 }
 
-// ── Build Cmux layout ──
-
-async function buildCmuxLayout(
-  layoutName: string,
-  template: TemplateConfig,
-  coderWsName: string,
-): Promise<string> {
-  const spinner = p.spinner();
-  spinner.start("Building Cmux layout");
-
-  const wsRef = await cmux.newWorkspace({ name: layoutName });
-
-  if (template.color) {
-    await cmux.setWorkspaceColor(wsRef, template.color);
-  }
-
-  // The workspace starts with one pane — the first leaf in the tree uses it
-  await walkLayout(template.layout, wsRef, coderWsName, true);
-
-  spinner.stop(`Cmux layout built — ${pc.cyan(wsRef)}`);
-  return wsRef;
-}
-
-/**
- * Recursively walk the layout tree and create panes/surfaces.
- *
- * `isFirst` indicates whether this node occupies the workspace's initial pane
- * (the first/leftmost leaf doesn't need a new-pane call).
- */
-async function walkLayout(
-  node: LayoutNode,
-  wsRef: string,
-  coderWs: string,
-  isFirst: boolean,
-): Promise<void> {
-  if (isPaneNode(node)) {
-    await configureSurfaces(node, wsRef, coderWs, isFirst);
-    return;
-  }
-
-  if (isSplitNode(node)) {
-    // First child occupies the current pane space
-    await walkLayout(node.children[0], wsRef, coderWs, isFirst);
-
-    // Second child creates a new pane via split
-    const direction = node.direction === "horizontal" ? "right" : "down";
-    await cmux.newPane({ workspace: wsRef, direction });
-
-    await walkLayout(node.children[1], wsRef, coderWs, true);
-  }
-}
-
-/**
- * Configure surfaces within a pane. The first terminal surface uses the
- * existing pane; additional surfaces are added as tabs.
- */
-async function configureSurfaces(
-  node: PaneNode,
-  wsRef: string,
-  coderWs: string,
-  isFirst: boolean,
-): Promise<void> {
-  const surfaces = node.pane.surfaces;
-
-  for (let i = 0; i < surfaces.length; i++) {
-    const surface = surfaces[i]!;
-    const isFirstSurface = i === 0 && isFirst;
-
-    if (surface.type === "browser") {
-      if (isFirstSurface) {
-        // Replace the initial terminal pane with a browser — create a new surface
-        // and the initial terminal will be there too. For simplicity, add as new surface.
-        await cmux.newSurface({
-          workspace: wsRef,
-          type: "browser",
-          url: surface.url,
-        });
-      } else {
-        await cmux.newSurface({
-          workspace: wsRef,
-          type: "browser",
-          url: surface.url,
-        });
-      }
-    } else {
-      // Terminal surface
-      const sshCmd = buildSshCommand(coderWs, { session: surface.session, command: surface.command });
-      if (isFirstSurface) {
-        // Send command to the existing pane's terminal
-        await cmux.send(`${sshCmd}\n`, { workspace: wsRef });
-      } else {
-        // Add a new terminal tab, then send command
-        const surfRef = await cmux.newSurface({
-          workspace: wsRef,
-          type: "terminal",
-        });
-        await cmux.send(`${sshCmd}\n`, {
-          workspace: wsRef,
-          surface: surfRef,
-        });
-      }
-    }
-  }
-}
-
-function buildSshCommand(coderWs: string, opts?: { session?: string; command?: string }): string {
-  const host = opts?.session ? `coder.${coderWs}.${opts.session}` : `coder.${coderWs}`;
-  const remoteCmd = opts?.command ? ` -t '${opts.command}'` : "";
-  return `ssh -R /tmp/cmux.sock:$CMUX_SOCKET_PATH ${host}${remoteCmd}`;
-}
-
-// ── Port forwarding ──
-
-function startPortForwarding(coderWsName: string, ports: string[]): void {
-  const tcpArgs: string[] = [];
-  for (const mapping of ports) {
-    tcpArgs.push("--tcp", mapping);
-  }
-
-  // Spawn as detached background process
-  const proc = Bun.spawn(["coder", "port-forward", coderWsName, ...tcpArgs], {
-    stdout: "ignore",
-    stderr: "ignore",
-    stdin: "ignore",
-  });
-
-  // Unref so it doesn't block CLI exit
-  proc.unref();
-
-  const summary = ports.join(", ");
-  consola.info(`Port forwarding started: ${pc.dim(summary)} (pid ${proc.pid})`);
-}

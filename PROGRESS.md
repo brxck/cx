@@ -15,8 +15,8 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `coder exec <workspace> <cmd>` | Not started | |
 | `coder open [workspace]` | Partial | Dashboard open exists in `coder list` action; no standalone command or IDE support yet |
 | `coder logs [workspace]` | Not started | |
-| `attach [workspace]` | Not started | |
-| `detach [layout]` | Not started | |
+| `attach [workspace]` | Done | Picks running Coder workspace, resolves template (or default single-pane), builds Cmux layout, saves to store. Reuses extracted layout-builder. |
+| `detach [layout]` | Done | Closes Cmux workspace, removes from store and cmux.json, keeps Coder workspace running. Auto-detects from cwd. |
 | `activate [layout]` | Done | Exact name, fuzzy match, or interactive picker. Switches Cmux workspace and touches store. |
 | `find <query>` | Done | Fuzzy search across name/coder_ws/template/branch/path, `--branch` with live sidebar state, `--path` flag. Activates on selection. |
 | `restore` | Not started | |
@@ -48,6 +48,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `src/lib/cmux.ts` | Cmux CLI wrapper: workspace/pane/surface CRUD, input, notifications, sidebar state with `SidebarState`/`parseSidebarState`, list-workspaces parsing |
 | `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
 | `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions, v2 schema |
+| `src/lib/layout-builder.ts` | Shared layout building: `buildCmuxLayout()` (tree walker + Cmux workspace creation), `startPortForwarding()` |
 | `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs |
 | `src/lib/workspace-picker.ts` | Shared interactive Coder workspace picker and layout picker (`pickLayout`) with fuzzy matching and status badges |
 | `src/lib/session-names.ts` | Generates session names from PNW town names, avoiding duplicates |
