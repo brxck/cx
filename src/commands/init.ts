@@ -2,6 +2,8 @@ import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { saveConfig } from "../lib/config.ts";
+import { ensureSshConfig } from "../lib/coder.ts";
+import { ensureZmxBlock } from "../lib/ssh-config.ts";
 
 export const initCommand = defineCommand({
   meta: {
@@ -45,6 +47,17 @@ export const initCommand = defineCommand({
     if (p.isCancel(agent)) { p.cancel("Cancelled."); process.exit(0); }
 
     await saveConfig({ username, agent: agent || "main" });
-    p.outro(`Config saved to ${pc.dim("~/.config/cmux-coder/config.json")}`);
+    p.log.success(`Config saved to ${pc.dim("~/.config/cmux-coder/config.json")}`);
+
+    // 4. Configure SSH for ZMX session persistence
+    const s = p.spinner();
+    s.start("Configuring SSH...");
+    await ensureSshConfig();
+    const inserted = await ensureZmxBlock();
+    s.stop(inserted
+      ? "SSH configured with ZMX session persistence"
+      : "SSH configured (ZMX block already present)");
+
+    p.outro("Ready to go!");
   },
 });
