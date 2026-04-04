@@ -166,6 +166,37 @@ export async function ensureSshConfig(): Promise<void> {
   await $`coder config-ssh -y`.quiet();
 }
 
+/** Run a one-off command on a workspace via SSH. Returns the exit code. */
+export async function execOnWorkspace(workspaceName: string, command: string[]): Promise<number> {
+  const proc = Bun.spawn(["ssh", `coder.${workspaceName}`, "--", ...command], {
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  return proc.exited;
+}
+
+/** Open a workspace in VS Code via the Coder CLI. */
+export async function openInVSCode(workspaceName: string): Promise<void> {
+  await $`coder open vscode ${workspaceName} --generate-token`.quiet();
+}
+
+/** Stream workspace agent logs. Returns the exit code. */
+export async function streamLogs(
+  workspaceName: string,
+  opts?: { follow?: boolean; build?: number },
+): Promise<number> {
+  const args = ["coder", "logs", workspaceName];
+  if (opts?.follow) args.push("--follow");
+  if (opts?.build !== undefined) args.push("--build-number", String(opts.build));
+  const proc = Bun.spawn(args, {
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  return proc.exited;
+}
+
 /** SSH into a workspace (replaces the current process). */
 export async function sshIntoWorkspace(workspaceName: string, session?: string): Promise<void> {
   const host = session ? `${workspaceName}.${session}` : workspaceName;

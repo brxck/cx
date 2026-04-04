@@ -12,9 +12,9 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `coder list` | Done | Interactive workspace picker with fuzzy filter, SSH and dashboard actions |
 | `coder ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
 | `coder ports [workspace]` | Done | Preset port mappings, interactive multi-select, custom mappings |
-| `coder exec <workspace> <cmd>` | Not started | |
-| `coder open [workspace]` | Partial | Dashboard open exists in `coder list` action; no standalone command or IDE support yet |
-| `coder logs [workspace]` | Not started | |
+| `coder exec <workspace> <cmd>` | Done | Runs command via SSH with `--` separator, checks workspace is running |
+| `coder open [workspace]` | Done | Dashboard (browser) and VS Code targets, interactive picker or `--target` flag |
+| `coder logs [workspace]` | Done | Streams agent logs with `--follow` (default) and `--build` number |
 | `attach [workspace]` | Done | Picks running Coder workspace, resolves template (or default single-pane), builds Cmux layout, saves to store. Reuses extracted layout-builder. |
 | `detach [layout]` | Done | Closes Cmux workspace, removes from store and cmux.json, keeps Coder workspace running. Auto-detects from cwd. |
 | `activate [layout]` | Done | Exact name, fuzzy match, or interactive picker. Switches Cmux workspace and touches store. |
@@ -49,7 +49,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
 | `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions, v2 schema |
 | `src/lib/layout-builder.ts` | Shared layout building: `buildCmuxLayout()` (tree walker + Cmux workspace creation), `startPortForwarding()` |
-| `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs |
+| `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs, exec, VS Code open, log streaming |
 | `src/lib/workspace-picker.ts` | Shared interactive Coder workspace picker and layout picker (`pickLayout`) with fuzzy matching and status badges |
 | `src/lib/session-names.ts` | Generates session names from PNW town names, avoiding duplicates |
 
