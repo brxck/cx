@@ -9,12 +9,12 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `up [workspace]` | Done | Resolves template (project-local or global), creates/starts Coder workspace, builds Cmux layout, starts port forwarding, saves to store with path, generates cmux.json. `--headless`/`-H` starts ZMX sessions without a Cmux layout. |
 | `down [layout]` | Done | Closes Cmux workspace, optionally stops Coder workspace (ephemeral defaults to stop, persistent to keep), removes from store, cleans up cmux.json. Auto-detects layout from cwd. |
 | `status` | Done | Rich dashboard joining store, Coder, Cmux, sidebar state, and port-forward processes. Per-layout boxes with Coder status, Cmux state (headless shown as `⊘ headless`), git branch/dirty, path, template, ports, sessions, Claude status, PR info. Untracked workspaces table. Summary line. `--json` and `--layout` flags. |
-| `coder list` | Done | Interactive workspace picker with fuzzy filter, SSH and dashboard actions |
-| `coder ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
-| `coder ports [workspace]` | Done | Preset port mappings, interactive multi-select, custom mappings |
-| `coder exec <workspace> <cmd>` | Done | Runs command via SSH with `--` separator, checks workspace is running |
-| `coder open [workspace]` | Done | Dashboard (browser) and VS Code targets, interactive picker or `--target` flag |
-| `coder logs [workspace]` | Done | Streams agent logs with `--follow` (default) and `--build` number |
+| `list` | Done | Interactive workspace picker with fuzzy filter, SSH and dashboard actions |
+| `ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
+| `ports [workspace]` | Done | Preset port mappings, interactive multi-select, custom mappings |
+| `exec <workspace> <cmd>` | Done | Runs command via SSH with `--` separator, checks workspace is running |
+| `open [workspace]` | Done | Dashboard (browser) and VS Code targets, interactive picker or `--target` flag |
+| `logs [workspace]` | Done | Streams agent logs with `--follow` (default) and `--build` number |
 | `attach [workspace]` | Done | Picks running Coder workspace, resolves template (or default single-pane), builds Cmux layout, saves to store. Detects headless layouts and re-attaches using stored ZMX session names. |
 | `detach [layout]` | Done | Closes Cmux workspace, removes from store and cmux.json, keeps Coder workspace running. Auto-detects from cwd. |
 | `activate [layout]` | Done | Exact name, fuzzy match, or interactive picker. Switches Cmux workspace and touches store. |
@@ -64,7 +64,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 
 | Item | Status | Notes |
 |---|---|---|
-| CLI scaffold (citty) | Done | Root command with subcommands in `src/cli.ts` |
+| CLI scaffold (citty) | Done | Root command with subcommands in `src/cli.ts`, grouped help output (Lifecycle, Navigation, Workspace, Configuration) |
 | Build (bun compile) | Done | Standalone binary to `dist/` |
 | SQLite state database | Done | `~/.config/cmux-coder/state.db`, v2 schema with `path` column |
 | Cmux CLI integration | Done | `src/lib/cmux.ts` wraps all needed cmux commands |
