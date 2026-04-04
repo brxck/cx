@@ -1,4 +1,5 @@
-import { defineCommand, runMain } from "citty";
+import { defineCommand, runMain, renderUsage } from "citty";
+import type { CommandDef } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
 import { version } from "../package.json";
@@ -25,17 +26,30 @@ const main = defineCommand({
     );
   },
   subCommands: {
-    status: statusCommand,
-    coder: coderCommand,
+    // Lifecycle
     up: upCommand,
     down: downCommand,
     attach: attachCommand,
     detach: detachCommand,
+    // Navigation
+    status: statusCommand,
     activate: activateCommand,
     find: findCommand,
     restore: restoreCommand,
+    // Configuration
     init: initCommand,
+    coder: coderCommand,
   },
 });
 
-runMain(main);
+async function customShowUsage(cmd: CommandDef, parent?: CommandDef) {
+  const usage = await renderUsage(cmd, parent);
+  // Strip the USAGE line (redundant with COMMANDS section)
+  const lines = usage.split("\n");
+  const filtered = lines.filter(
+    (line) => !line.includes("USAGE") && line.trim() !== ""
+  );
+  console.log(filtered.join("\n") + "\n");
+}
+
+runMain(main, { showUsage: customShowUsage });
