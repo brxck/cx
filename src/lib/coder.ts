@@ -81,6 +81,91 @@ export async function openInBrowser(url: string): Promise<void> {
   await $`open ${url}`.quiet();
 }
 
+/** Create a new Coder workspace. Streams build logs to stderr. */
+export async function createWorkspace(
+  name: string,
+  template: string,
+  opts?: { params?: Record<string, string>; preset?: string },
+): Promise<void> {
+  const args = ["coder", "create", "-t", template, name, "-y", "--use-parameter-defaults"];
+  if (opts?.preset) {
+    args.push("--preset", opts.preset);
+  }
+  if (opts?.params) {
+    for (const [key, value] of Object.entries(opts.params)) {
+      args.push("--parameter", `${key}=${value}`);
+    }
+  }
+  const proc = Bun.spawn(args, {
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`coder create exited with code ${code}`);
+}
+
+/** Stop a running Coder workspace. */
+export async function stopWorkspace(name: string): Promise<void> {
+  const proc = Bun.spawn(["coder", "stop", name, "-y"], {
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`coder stop exited with code ${code}`);
+}
+
+/** Start a stopped Coder workspace. Streams build logs to stderr. */
+export async function startWorkspace(name: string): Promise<void> {
+  const proc = Bun.spawn(["coder", "start", name], {
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`coder start exited with code ${code}`);
+}
+
+/**
+ * Poll until a workspace is running with a connected agent.
+ * Streams build logs via `coder logs -f` while waiting.
+ * Throws after timeout (default 5 minutes).
+ */
+export async function waitForWorkspace(
+  name: string,
+  timeoutMs = 5 * 60 * 1000,
+): Promise<void> {
+  // Stream build logs in the background
+  const logProc = Bun.spawn(["coder", "logs", "-f", name], {
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  try {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const workspaces = await listWorkspaces();
+      const ws = workspaces.find((w) => w.name === name);
+      if (ws && workspaceStatus(ws) === "running") {
+        const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
+        const allConnected = agents.length > 0 && agents.every((a) => a.status === "connected");
+        if (allConnected) return;
+      }
+      await Bun.sleep(3000);
+    }
+    throw new Error(`Timed out waiting for workspace "${name}" to be ready`);
+  } finally {
+    logProc.kill();
+  }
+}
+
+/** Ensure SSH config is up to date for Coder workspaces. */
+export async function ensureSshConfig(): Promise<void> {
+  await $`coder config-ssh -y`.quiet();
+}
+
 /** SSH into a workspace (replaces the current process). */
 export async function sshIntoWorkspace(workspaceName: string, session?: string): Promise<void> {
   const host = session ? `${workspaceName}.${session}` : workspaceName;

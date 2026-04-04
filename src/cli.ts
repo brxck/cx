@@ -6,6 +6,8 @@ import { statusCommand } from "./commands/status.ts";
 import { listCommand } from "./commands/list.ts";
 import { sshCommand } from "./commands/ssh.ts";
 import { portForwardCommand } from "./commands/port-forward.ts";
+import { upCommand } from "./commands/up.ts";
+import { downCommand } from "./commands/down.ts";
 
 const main = defineCommand({
   meta: {
@@ -23,6 +25,8 @@ const main = defineCommand({
 list: listCommand,
     ssh: sshCommand,
     ports: portForwardCommand,
+    up: upCommand,
+    down: downCommand,
   },
 });
 

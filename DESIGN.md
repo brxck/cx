@@ -222,9 +222,42 @@ Terminal surfaces in generated Cmux commands include `-R /tmp/cmux.sock:$CMUX_SO
 
 A remote AI agent can then create panes, send commands, update the status bar, send notifications, and log to the sidebar — turning a remote coding agent into a full local workspace orchestrator.
 
+## Templates
+
+### Global Templates
+
+JSON files at `~/.config/cmux-coder/templates/*.json`. Each defines a Coder workspace config + Cmux layout tree. Reuses the same recursive split/pane structure as `cmux.json` custom commands.
+
+### Per-Project Templates
+
+A `cmux-coder.json` file in a project root (or git root) defines templates for that project. The file contains a `templates` array of named template configs:
+
+```json
+{
+  "templates": [
+    { "name": "frontend", "coder": { "template": "dev" }, "type": "ephemeral", "layout": { ... } },
+    { "name": "backend", "coder": { "template": "dev" }, "type": "persistent", "layout": { ... } }
+  ]
+}
+```
+
+When running `up`, project-local templates are merged with global templates in the interactive picker. Project templates are labeled `(project)` for distinction.
+
+Resolution order:
+1. If `--template` is given, check project-local templates first, then global
+2. Otherwise, show a merged picker of project-local + global templates
+3. Selected project-local templates associate the layout with the project directory
+
+### Path Association
+
+Layouts are associated with the local project directory they were created from (stored as `path` in the SQLite `layouts` table). This enables:
+
+- **`down` auto-detection** — running `down` from a project directory finds layouts for that path. If one match, confirms before tearing down. If multiple, shows a picker scoped to those layouts.
+- **`find` by path** — locate layouts by which repo they're tied to
+
 ## State Storage (SQLite)
 
-All local state is stored in a single SQLite database at `~/.config/cmux-coder/state.db`, accessed via `bun:sqlite`. Two tables — `layouts` and `sessions` — with cascade deletes for cleanup. Sessions have a nullable layout FK so `ssh` works standalone. Port forwarding state is not persisted; runtime port state comes from the OS, and desired ports come from layout templates. Schema versioned via `PRAGMA user_version`. All API functions are synchronous.
+All local state is stored in a single SQLite database at `~/.config/cmux-coder/state.db`, accessed via `bun:sqlite`. Two tables — `layouts` and `sessions` — with cascade deletes for cleanup. Sessions have a nullable layout FK so `ssh` works standalone. Layouts track the local project `path` for directory-based auto-detection. Port forwarding state is not persisted; runtime port state comes from the OS, and desired ports come from layout templates. Schema versioned via `PRAGMA user_version`. All API functions are synchronous.
 
 Implementation: `src/lib/store.ts`
 

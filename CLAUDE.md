@@ -1,27 +1,35 @@
----
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
----
-
 # cmux-coder
 
-CLI for integrating Cmux with Coder remote dev environments.
+CLI for orchestrating Cmux layouts on top of Coder remote dev environments.
+
+## Project docs
+
+- `DESIGN.md` — architecture, command reference, Cmux integration, SSH socket forwarding, template system, state storage
+- `PROGRESS.md` — implementation status of all commands, features, and infrastructure
+
+Read these before making changes.
 
 ## Stack
 
 - **Runtime**: Bun
 - **Arg parsing**: Citty — `defineCommand` / `runMain`
-- **Prompts**: @clack/prompts — use `group()` API for Bun reliability
+- **Prompts**: @clack/prompts
 - **Logging**: consola
 - **Colors**: picocolors
+- **State**: bun:sqlite at `~/.config/cmux-coder/state.db`
 - **Build**: `bun build --compile` for standalone binaries
 
 ## Project layout
 
 - `src/cli.ts` — main entry, defines root command and subcommands
 - `src/commands/*.ts` — one file per subcommand, each exports a `defineCommand`
-- `bin/cli.ts` — shebang entrypoint for `npm bin`
+- `src/lib/store.ts` — SQLite state store (layouts, sessions), schema migrations via `PRAGMA user_version`
+- `src/lib/cmux.ts` — Cmux CLI wrapper (workspaces, panes, surfaces, input, notifications)
+- `src/lib/templates.ts` — template types, load/save, per-project discovery, cmux.json generation
+- `src/lib/coder.ts` — Coder CLI wrapper (list, create, start, stop, wait, SSH, config-ssh)
+- `src/lib/workspace-picker.ts` — shared interactive workspace picker
+- `src/lib/session-names.ts` — PNW town name generator for SSH sessions
+- `bin/cli.ts` — shebang entrypoint
 
 ## Scripts
 
@@ -29,110 +37,18 @@ CLI for integrating Cmux with Coder remote dev environments.
 - `bun run build` — compile standalone binary to `dist/`
 - `bun run typecheck` — type-check without emitting
 
+## Terminology
+
+- **Workspace** — a Coder remote dev environment
+- **Layout** — a Cmux workspace (renamed to avoid collision with Coder's "workspace")
+- **Template** — config that defines a layout: Coder workspace params + Cmux split/pane/surface tree
+
 ## Conventions
 
-Default to using Bun instead of Node.js.
-
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
-
-## APIs
-
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
-
-## Testing
-
-Use `bun test` to run tests.
-
-```ts#index.test.ts
-import { test, expect } from "bun:test";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
-
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+- Use Bun APIs: `Bun.$` for shell, `Bun.file` for file I/O, `bun:sqlite` for SQLite
+- Shell commands via `Bun.$\`cmd\`.quiet()` for captured output, `Bun.spawn()` for interactive/long-running processes
+- All store functions are synchronous (bun:sqlite is sync)
+- Commands follow the pattern: resolve target (arg or interactive picker) → do work with spinners → save state
+- Cmux CLI has no JSON output for `list-workspaces`; we parse text output (see `parseWorkspaceLine` in cmux.ts)
+- Templates use the same recursive split tree format as Cmux custom commands (cmux.json)
+- Generated cmux.json entries are tagged with `_generator: "cmux-coder"` for safe merge/cleanup

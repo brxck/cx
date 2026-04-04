@@ -6,12 +6,12 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 
 | Command | Status | Notes |
 |---|---|---|
-| `up [layout]` | Not started | Core lifecycle — depends on layout templates and Cmux socket API |
-| `down [layout]` | Not started | |
+| `up [workspace]` | Done | Resolves template (project-local or global), creates/starts Coder workspace, builds Cmux layout, starts port forwarding, saves to store with path, generates cmux.json |
+| `down [layout]` | Done | Closes Cmux workspace, optionally stops Coder workspace (ephemeral defaults to stop, persistent to keep), removes from store, cleans up cmux.json. Auto-detects layout from cwd. |
 | `attach [workspace]` | Not started | |
 | `detach [layout]` | Not started | |
-| `activate [layout]` | Not started | Depends on Cmux socket API integration |
-| `find <query>` | Not started | Depends on layout state persistence |
+| `activate [layout]` | Not started | |
+| `find <query>` | Not started | |
 | `status` | Stub | Command exists but not implemented (`src/commands/status.ts`) |
 | `list` | Done | Interactive workspace picker with fuzzy filter, SSH and dashboard actions |
 | `ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
@@ -19,29 +19,34 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `exec <workspace> <cmd>` | Not started | |
 | `open [workspace]` | Partial | Dashboard open exists in `list` action; no standalone command or IDE support yet |
 | `logs [workspace]` | Not started | |
-| `templates list` | Not started | |
-| `templates create` | Not started | |
-| `templates edit <name>` | Not started | |
-| `restore` | Not started | Depends on layout state persistence |
+| `restore` | Not started | |
 
 ## Features
 
 | Feature | Status | Notes |
 |---|---|---|
-| Declarative layout templates | Not started | Template schema, storage location, and parsing TBD |
-| Active layout auto port forwarding | Not started | Depends on Cmux socket API for focus detection |
-| Layout state persistence | Done | SQLite store with layouts, sessions, ports tables |
+| Layout templates (global) | Done | JSON templates at `~/.config/cmux-coder/templates/`, reuses cmux.json layout tree format |
+| Per-project templates | In progress | `cmux-coder.json` at project/git root, auto-discovered by `up` |
+| Path association | In progress | `path` column on layouts table, enables cwd-based auto-detection in `down`/`find` |
+| cmux.json generation | Done | Generates Cmux custom commands with SSH + socket forwarding, merges with existing entries |
+| Cmux layout orchestration | Done | Recursive layout tree walker: splits → `new-pane`, surfaces → `send`/`new-surface` |
+| Coder workspace lifecycle | Done | Create, start, stop, wait-for-ready with agent polling |
+| SSH config management | Done | Auto-runs `coder config-ssh -y` before layout creation |
+| Background port forwarding | Done | Spawns detached `coder port-forward` process from template port config |
+| Layout state persistence | Done | SQLite store with layouts and sessions tables |
+| Ephemeral vs persistent layout types | Done | Schema, templates, and `down` behavior all wired up |
+| Active layout auto port forwarding | Not started | Depends on Cmux focus detection |
 | Git branch awareness | Not started | Schema supports it (`branch` column on layouts) |
-| Workspace lifecycle hooks | Not started | |
 | Health monitoring | Not started | |
-| Ephemeral vs persistent layout types | Not started | Schema supports it (`type` column on layouts) |
 
 ## Libraries
 
 | Module | Purpose |
 |---|---|
-| `src/lib/store.ts` | SQLite state store — layouts, sessions, ports. Unified replacement for old JSON stores |
-| `src/lib/coder.ts` | Coder API: list workspaces, status parsing, SSH, browser open, dashboard URLs |
+| `src/lib/cmux.ts` | Cmux CLI wrapper: workspace/pane/surface CRUD, input, notifications, list-workspaces parsing |
+| `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
+| `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions |
+| `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs |
 | `src/lib/workspace-picker.ts` | Shared interactive workspace picker with fuzzy matching and status badges |
 | `src/lib/session-names.ts` | Generates session names from PNW town names, avoiding duplicates |
 
@@ -51,6 +56,8 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 |---|---|---|
 | CLI scaffold (citty) | Done | Root command with subcommands in `src/cli.ts` |
 | Build (bun compile) | Done | Standalone binary to `dist/` |
-| SQLite state database | Done | `~/.config/cmux-coder/state.db`, migrated via `PRAGMA user_version` |
-| Cmux socket API integration | Not started | Required for layout orchestration, activate, find |
-| Layout template storage | Not started | Likely `~/.config/cmux-coder/templates/` or project-local |
+| SQLite state database | Done | `~/.config/cmux-coder/state.db`, v2 schema with `path` column |
+| Cmux CLI integration | Done | `src/lib/cmux.ts` wraps all needed cmux commands |
+| Template storage (global) | Done | `~/.config/cmux-coder/templates/*.json` |
+| Template storage (per-project) | In progress | `cmux-coder.json` at project root |
+| cmux.json integration | Done | Writes to `~/.config/cmux/cmux.json`, preserves non-generated entries |

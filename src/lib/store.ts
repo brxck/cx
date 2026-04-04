@@ -38,6 +38,11 @@ function migrate(db: Database): void {
     db.exec(SCHEMA_V1);
     db.exec("PRAGMA user_version = 1");
   }
+
+  if (version < 2) {
+    db.exec("ALTER TABLE layouts ADD COLUMN path TEXT");
+    db.exec("PRAGMA user_version = 2");
+  }
 }
 
 export function getDb(): Database {
@@ -61,6 +66,7 @@ export interface LayoutEntry {
   template: string | null;
   type: LayoutType;
   branch: string | null;
+  path: string | null;
   created_at: string;
   active_at: string;
 }
@@ -87,6 +93,12 @@ export function findLayoutsByBranch(branch: string): LayoutEntry[] {
   return getDb().query<LayoutEntry, [string]>("SELECT * FROM layouts WHERE branch LIKE '%' || ? || '%'").all(branch);
 }
 
+export function getLayoutsByPath(path: string): LayoutEntry[] {
+  return getDb()
+    .query<LayoutEntry, [string]>("SELECT * FROM layouts WHERE path = ? ORDER BY active_at DESC")
+    .all(path);
+}
+
 export function saveLayout(entry: {
   name: string;
   cmux_id: string;
@@ -94,13 +106,14 @@ export function saveLayout(entry: {
   template?: string | null;
   type?: LayoutType;
   branch?: string | null;
+  path?: string | null;
 }): void {
   getDb()
     .query(
-      `INSERT INTO layouts (name, cmux_id, coder_ws, template, type, branch)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+      `INSERT INTO layouts (name, cmux_id, coder_ws, template, type, branch, path)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
        ON CONFLICT(name) DO UPDATE SET
-         cmux_id = ?2, coder_ws = ?3, template = ?4, type = ?5, branch = ?6,
+         cmux_id = ?2, coder_ws = ?3, template = ?4, type = ?5, branch = ?6, path = ?7,
          active_at = datetime('now')`
     )
     .run(
@@ -109,7 +122,8 @@ export function saveLayout(entry: {
       entry.coder_ws,
       entry.template ?? null,
       entry.type ?? "persistent",
-      entry.branch ?? null
+      entry.branch ?? null,
+      entry.path ?? null
     );
 }
 
