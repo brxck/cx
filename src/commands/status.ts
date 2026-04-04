@@ -194,7 +194,9 @@ function renderLayoutBox(layout: LayoutStatus): void {
   lines.push(field("Coder", coderParts.join("  ")));
 
   // Cmux
-  if (layout.cmuxActive) {
+  if (layout.cmuxRef === "headless" && !layout.cmuxActive) {
+    lines.push(field("Cmux", pc.yellow("⊘") + "  headless"));
+  } else if (layout.cmuxActive) {
     const cmuxParts = [pc.green("●"), "active", pc.dim(layout.cmuxRef)];
     if (layout.cmuxSelected) cmuxParts.push(pc.cyan("[selected]"));
     lines.push(field("Cmux", cmuxParts.join("  ")));

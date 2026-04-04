@@ -17,8 +17,8 @@ import {
   writeCmuxJson,
   type TemplateConfig,
 } from "../lib/templates.ts";
-import { saveLayout } from "../lib/store.ts";
-import { buildCmuxLayout, startPortForwarding } from "../lib/layout-builder.ts";
+import { saveLayout, recordSession } from "../lib/store.ts";
+import { buildCmuxLayout, startHeadlessSessions, startPortForwarding } from "../lib/layout-builder.ts";
 
 export const upCommand = defineCommand({
   meta: {
@@ -39,6 +39,12 @@ export const upCommand = defineCommand({
     "no-ports": {
       type: "boolean",
       description: "Skip port forwarding",
+      default: false,
+    },
+    headless: {
+      type: "boolean",
+      alias: "H",
+      description: "Start ZMX sessions without creating a Cmux layout",
       default: false,
     },
   },
@@ -81,16 +87,45 @@ export const upCommand = defineCommand({
     await ensureSshConfig();
     sshSpinner.stop("SSH config updated");
 
-    // 4. Build Cmux layout
-    const cmuxRef = await buildCmuxLayout(layoutName, template, coderWsName);
-
-    // 5. Port forwarding
+    // 4. Port forwarding
     const noPorts = args["no-ports"] as boolean;
     if (!noPorts && template.ports?.length) {
       startPortForwarding(coderWsName, template.ports);
     }
 
-    // 6. Save to store
+    // 5. Generate cmux.json (for later attachment or custom commands)
+    const cmd = generateCmuxCommand(template, coderWsName);
+    await writeCmuxJson([cmd]);
+
+    if (args.headless) {
+      // Headless: start ZMX sessions without a Cmux layout
+      const sessions = await startHeadlessSessions(template, coderWsName);
+
+      for (const session of sessions) {
+        recordSession(coderWsName, session.name, layoutName);
+      }
+
+      saveLayout({
+        name: layoutName,
+        cmux_id: "headless",
+        coder_ws: coderWsName,
+        template: template.name,
+        type: template.type,
+        path: projectPath,
+      });
+
+      p.outro(`${pc.green("✓")} Headless layout ${pc.bold(layoutName)} — ${sessions.length} ZMX sessions started`);
+      return;
+    }
+
+    // 6. Build Cmux layout
+    const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, coderWsName);
+
+    for (const session of sessions) {
+      recordSession(coderWsName, session.name, layoutName);
+    }
+
+    // 7. Save to store
     saveLayout({
       name: layoutName,
       cmux_id: cmuxRef,
@@ -99,10 +134,6 @@ export const upCommand = defineCommand({
       type: template.type,
       path: projectPath,
     });
-
-    // 7. Generate cmux.json
-    const cmd = generateCmuxCommand(template, coderWsName);
-    await writeCmuxJson([cmd]);
 
     p.outro(
       `${pc.green("✓")} Layout ${pc.bold(layoutName)} is ready — workspace ${pc.cyan(cmuxRef)}`,

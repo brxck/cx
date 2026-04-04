@@ -8,8 +8,8 @@ import {
   writeCmuxJson,
   type TemplateConfig,
 } from "../lib/templates.ts";
-import { saveLayout } from "../lib/store.ts";
-import { buildCmuxLayout, startPortForwarding } from "../lib/layout-builder.ts";
+import { saveLayout, updateLayout, getLayout, getSessionsForLayout, recordSession } from "../lib/store.ts";
+import { buildCmuxLayout, startPortForwarding, collectTerminalSurfaces } from "../lib/layout-builder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
 export const attachCommand = defineCommand({
@@ -58,6 +58,10 @@ export const attachCommand = defineCommand({
 
     p.intro(pc.bold(`cmux-coder attach ${pc.cyan(layoutName)}`));
 
+    // Check for existing headless layout
+    const existingLayout = getLayout(layoutName);
+    const isHeadlessReattach = existingLayout?.cmux_id === "headless";
+
     // 2. Resolve template
     let template: TemplateConfig;
     let projectPath: string | null = null;
@@ -84,6 +88,16 @@ export const attachCommand = defineCommand({
       };
     }
 
+    // If re-attaching a headless layout, inject stored session names
+    if (isHeadlessReattach) {
+      const storedSessions = getSessionsForLayout(existingLayout!.name);
+      const terminals = collectTerminalSurfaces(template.layout);
+      for (let i = 0; i < terminals.length && i < storedSessions.length; i++) {
+        terminals[i]!.session = storedSessions[i]!;
+      }
+      p.log.info(`Re-attaching headless layout with ${storedSessions.length} existing sessions`);
+    }
+
     // 3. Ensure SSH config
     const sshSpinner = p.spinner();
     sshSpinner.start("Updating SSH config");
@@ -91,7 +105,11 @@ export const attachCommand = defineCommand({
     sshSpinner.stop("SSH config updated");
 
     // 4. Build Cmux layout
-    const cmuxRef = await buildCmuxLayout(layoutName, template, workspace.name);
+    const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, workspace.name);
+
+    for (const session of sessions) {
+      recordSession(workspace.name, session.name, layoutName);
+    }
 
     // 5. Port forwarding
     const noPorts = args["no-ports"] as boolean;
