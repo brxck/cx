@@ -101,10 +101,6 @@ export const upCommand = defineCommand({
       // Headless: start ZMX sessions without a Cmux layout
       const sessions = await startHeadlessSessions(template, coderWsName);
 
-      for (const session of sessions) {
-        recordSession(coderWsName, session.name, layoutName);
-      }
-
       saveLayout({
         name: layoutName,
         cmux_id: "headless",
@@ -114,6 +110,10 @@ export const upCommand = defineCommand({
         path: projectPath,
       });
 
+      for (const session of sessions) {
+        recordSession(coderWsName, session.name, layoutName);
+      }
+
       p.outro(`${pc.green("✓")} Headless layout ${pc.bold(layoutName)} — ${sessions.length} ZMX sessions started`);
       return;
     }
@@ -121,11 +121,7 @@ export const upCommand = defineCommand({
     // 6. Build Cmux layout
     const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, coderWsName);
 
-    for (const session of sessions) {
-      recordSession(coderWsName, session.name, layoutName);
-    }
-
-    // 7. Save to store
+    // 7. Save to store (must happen before recordSession due to FK constraint)
     saveLayout({
       name: layoutName,
       cmux_id: cmuxRef,
@@ -134,6 +130,10 @@ export const upCommand = defineCommand({
       type: template.type,
       path: projectPath,
     });
+
+    for (const session of sessions) {
+      recordSession(coderWsName, session.name, layoutName);
+    }
 
     p.outro(
       `${pc.green("✓")} Layout ${pc.bold(layoutName)} is ready — workspace ${pc.cyan(cmuxRef)}`,

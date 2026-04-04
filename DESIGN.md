@@ -40,6 +40,7 @@ Spin up a Coder workspace and Cmux layout from a template. If the workspace alre
 - `--template <name>` — layout template to use
 - `--workspace <name>` — override workspace name
 - `--no-ports` — skip automatic port forwarding
+- `--headless` — create the Coder workspace and start ZMX sessions, but don't create a Cmux layout (see [Headless Mode](#headless-mode))
 
 #### `down [layout]`
 
@@ -224,6 +225,76 @@ This enables **remote Cmux control** — an AI agent running on the remote works
 Terminal surfaces in generated Cmux commands include `-R /tmp/cmux.sock:$CMUX_SOCKET_PATH` to forward the local Cmux socket to the remote. On the remote side, any process writing to `/tmp/cmux.sock` talks to the local Cmux instance.
 
 A remote AI agent can then create panes, send commands, update the status bar, send notifications, and log to the sidebar — turning a remote coding agent into a full local workspace orchestrator.
+
+## ZMX Sessions
+
+Reference: https://github.com/neurosnap/zmx
+
+ZMX is a terminal session multiplexer running on the remote Coder workspace. It provides persistent, named sessions that survive SSH disconnects.
+
+### Key Commands
+
+| Command | Description |
+|---|---|
+| `zmx attach <name>` | Create or attach to a named session (upsert) |
+| `zmx run <name> <cmd>` | Start a detached session running a command |
+| `zmx list [--short]` | List active sessions |
+| `zmx kill <name>` | Terminate a session |
+| `zmx wait <name>` | Block until a session's command completes |
+| `zmx history <name>` | Read scrollback buffer |
+
+### SSH Integration
+
+ZMX integrates with SSH via `RemoteCommand zmx attach %k` in the SSH config. When connecting to `coder.workspace.session`, SSH runs `zmx attach session` on the remote, creating or attaching to the named ZMX session. This is how `coder config-ssh` works with session names.
+
+### Session Tracking
+
+Every terminal surface in a layout gets a named ZMX session. Session names are stored in the `sessions` table, linked to both the Coder workspace and the layout. This means:
+
+- Sessions persist on the remote even when the local Cmux layout is closed
+- Re-attaching a layout connects to existing sessions (no work lost)
+- `status` can show which sessions are active on a workspace
+- `headless` mode creates sessions without any local presentation
+
+## Headless Mode
+
+`up --headless` creates a Coder workspace and starts ZMX sessions on it, but does **not** create a Cmux layout. The sessions run detached on the remote and can be attached later with `attach`.
+
+### Flow
+
+1. Create/start Coder workspace (same as normal `up`)
+2. Ensure SSH config
+3. For each terminal surface in the template:
+   - Generate a session name (from `session-names.ts` or the surface's `session` field)
+   - SSH into the workspace and run `zmx run {session} {command}` to start a detached session
+   - Record the session in the store
+4. Start port forwarding (if template has ports)
+5. Save layout to store with `cmux_id` set to a sentinel value (e.g. `"headless"`) indicating no Cmux workspace
+6. Generate cmux.json for later palette invocation
+
+### Attaching Later
+
+When `attach` is run against a headless layout:
+
+1. Create the Cmux layout (workspace + panes/surfaces)
+2. Each terminal pane connects via `ssh coder.{workspace}.{session}` which attaches to the existing ZMX session
+3. Update the store with the real Cmux workspace ref
+
+This means no work is lost — the sessions were running the whole time.
+
+### Why This Matters
+
+- **AI agents** can spin up workspaces and start long-running tasks (builds, tests, deploys) without needing a local Cmux layout. The human attaches later to see the results.
+- **Batch operations** — start multiple workspaces headlessly, attach to whichever one you need.
+- **Remote-first** — the remote sessions are the source of truth, the local Cmux layout is just a view into them.
+
+### Impact on Normal `up`
+
+Even without `--headless`, the normal `up` flow should create named ZMX sessions for every terminal surface. This means:
+
+- Closing and re-opening a Cmux layout reconnects to the same sessions
+- `restore` after a restart attaches to sessions that are still running on the remote
+- Sessions are always named and tracked, headless just skips the Cmux layout step
 
 ## Templates
 

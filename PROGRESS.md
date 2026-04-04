@@ -19,7 +19,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `detach [layout]` | Done | Closes Cmux workspace, removes from store and cmux.json, keeps Coder workspace running. Auto-detects from cwd. |
 | `activate [layout]` | Done | Exact name, fuzzy match, or interactive picker. Switches Cmux workspace and touches store. |
 | `find <query>` | Done | Fuzzy search across name/coder_ws/template/branch/path, `--branch` with live sidebar state, `--path` flag. Activates on selection. |
-| `restore` | Not started | |
+| `restore` | Done | Restores layouts after restart: checks Coder workspace status (starts if stopped, skips if deleted), probes live ZMX sessions via SSH, reuses alive sessions / restarts dead ones, rebuilds Cmux layout, updates store, starts port forwarding, regenerates cmux.json. `--dry-run`/`-n` previews. Sorts persistent-first. |
 
 ## Features
 
