@@ -3,9 +3,7 @@ import { consola } from "consola";
 import pc from "picocolors";
 import { version } from "../package.json";
 import { statusCommand } from "./commands/status.ts";
-import { listCommand } from "./commands/list.ts";
-import { sshCommand } from "./commands/ssh.ts";
-import { portForwardCommand } from "./commands/port-forward.ts";
+import { coderCommand } from "./commands/coder.ts";
 import { upCommand } from "./commands/up.ts";
 import { downCommand } from "./commands/down.ts";
 
@@ -22,9 +20,7 @@ const main = defineCommand({
   },
   subCommands: {
     status: statusCommand,
-list: listCommand,
-    ssh: sshCommand,
-    ports: portForwardCommand,
+    coder: coderCommand,
     up: upCommand,
     down: downCommand,
   },

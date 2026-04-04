@@ -161,6 +161,15 @@ export async function sendKey(
   await $`cmux send-key ${args} ${key}`.quiet();
 }
 
+// ── Sidebar ──
+
+/** Get sidebar state for a workspace. Returns raw text output. */
+export async function sidebarState(workspace?: string): Promise<string> {
+  const args: string[] = [];
+  if (workspace) args.push("--workspace", workspace);
+  return (await $`cmux sidebar-state ${args}`.quiet().text()).trim();
+}
+
 // ── Notifications ──
 
 /** Show a native notification. */

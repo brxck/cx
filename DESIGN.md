@@ -19,13 +19,14 @@ cmux-coder
 ├── activate [layout]        # focus a layout in cmux
 ├── find <query>             # search layouts by name/branch/template
 ├── status                   # dashboard of all layouts + workspaces
-├── list                     # list workspaces (enhanced)
-├── ssh [workspace]          # SSH with session management
-├── ports [workspace]        # port forwarding with presets
-├── exec <workspace> <cmd>   # run one-off command on workspace
-├── open [workspace]         # open dashboard or IDE
-├── logs [workspace]         # stream workspace agent logs
-└── restore                  # re-establish layouts after restart
+├── restore                  # re-establish layouts after restart
+└── coder                    # Coder workspace utilities
+    ├── list                 # list workspaces (enhanced)
+    ├── ssh [workspace]      # SSH with session management
+    ├── ports [workspace]    # port forwarding with presets
+    ├── exec <workspace> <cmd> # run one-off command on workspace
+    ├── open [workspace]     # open dashboard or IDE
+    └── logs [workspace]     # stream workspace agent logs
 ```
 
 ## Commands
@@ -74,35 +75,37 @@ Locate layouts by name, git branch checked out in the workspace, or Coder templa
 
 Dashboard view showing all layouts with their workspace state (running/stopped/starting), active sessions, git branch, and health. Non-interactive by default, interactive with `--interactive`.
 
-#### `list`
-
-List Coder workspaces. Enhanced to show layout association (which layouts are connected to which workspaces) and detached state.
-
-### Utilities
-
-#### `ssh [workspace]`
-
-SSH into a workspace with ZMX session management. Existing implementation with session name generation and history.
-
-#### `ports [workspace]`
-
-Port forwarding with preset mappings and interactive selection. Existing implementation.
-
-#### `exec <workspace> <cmd>`
-
-Run a one-off command on a workspace without a full SSH session. Useful for quick checks, running scripts, or automation.
-
-#### `open [workspace]`
-
-Open a workspace in the Coder dashboard, VS Code Remote, or JetBrains Gateway. Interactively pick the target if multiple options available.
-
-#### `logs [workspace]`
-
-Stream workspace agent logs. Useful for debugging workspace startup issues or monitoring agent health.
-
 #### `restore`
 
 Re-establish all layouts after a restart. Reads persisted layout state, starts any stopped workspaces, and re-invokes the Cmux custom commands.
+
+### Coder Utilities (`coder <cmd>`)
+
+Commands that interact directly with Coder workspaces without touching Cmux layouts.
+
+#### `coder list`
+
+List Coder workspaces. Enhanced to show layout association (which layouts are connected to which workspaces) and detached state.
+
+#### `coder ssh [workspace]`
+
+SSH into a workspace with ZMX session management. Existing implementation with session name generation and history.
+
+#### `coder ports [workspace]`
+
+Port forwarding with preset mappings and interactive selection. Existing implementation.
+
+#### `coder exec <workspace> <cmd>`
+
+Run a one-off command on a workspace without a full SSH session. Useful for quick checks, running scripts, or automation.
+
+#### `coder open [workspace]`
+
+Open a workspace in the Coder dashboard, VS Code Remote, or JetBrains Gateway. Interactively pick the target if multiple options available.
+
+#### `coder logs [workspace]`
+
+Stream workspace agent logs. Useful for debugging workspace startup issues or monitoring agent health.
 
 ## Cmux Integration
 
