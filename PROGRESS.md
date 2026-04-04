@@ -20,6 +20,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `activate [layout]` | Done | Exact name, fuzzy match, or interactive picker. Switches Cmux workspace and touches store. |
 | `find <query>` | Done | Fuzzy search across name/coder_ws/template/branch/path, `--branch` with live sidebar state, `--path` flag. Activates on selection. |
 | `restore` | Done | Restores layouts after restart: checks Coder workspace status (starts if stopped, skips if deleted), probes live ZMX sessions via SSH, reuses alive sessions / restarts dead ones, rebuilds Cmux layout, updates store, starts port forwarding, regenerates cmux.json. `--dry-run`/`-n` previews. Sorts persistent-first. |
+| `init` | Done | Interactive config setup. Auto-detects username from `coder whoami`, prompts for confirmation and agent name. Saves to `~/.config/cmux-coder/config.json`. |
 
 ## Features
 
@@ -39,6 +40,8 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | Port-forward detection | Done | Parses `ps aux` for running `coder port-forward` processes |
 | Headless mode | Done | `up --headless` starts ZMX sessions without Cmux layout; `attach` re-connects to headless sessions; `status` shows `⊘ headless` badge |
 | ZMX session tracking | Done | All terminal surfaces get named ZMX sessions, recorded in store, reconnectable across layout rebuilds |
+| Config file | Done | `~/.config/cmux-coder/config.json` stores `username` and optional `agent` (default `"main"`). Required for SSH host construction. |
+| Centralized SSH host builder | Done | `src/lib/ssh.ts` — `sshHost()` builds `{agent}.{workspace}.{username}.coder`, `sshHostWithSession()` appends `.{session}`. All callsites migrated from old `coder.{workspace}` format. |
 | Active layout auto port forwarding | Not started | Depends on Cmux focus detection |
 | Git branch awareness | Partial | Live git data from Cmux sidebar in `status`; not yet stored/searchable |
 | Health monitoring | Not started | |
@@ -51,6 +54,8 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
 | `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions, v2 schema |
 | `src/lib/layout-builder.ts` | Shared layout building: `buildCmuxLayout()` (tree walker + Cmux workspace creation, returns sessions), `startHeadlessSessions()`, `collectTerminalSurfaces()`, `assignSessionNames()`, `startPortForwarding()` |
+| `src/lib/config.ts` | Config load/save for `~/.config/cmux-coder/config.json` (username, agent) |
+| `src/lib/ssh.ts` | Centralized SSH host construction using config — `sshHost()`, `sshHostWithSession()` |
 | `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs, exec, VS Code open, log streaming |
 | `src/lib/workspace-picker.ts` | Shared interactive Coder workspace picker and layout picker (`pickLayout`) with fuzzy matching and status badges |
 | `src/lib/session-names.ts` | Generates session names from PNW town names, avoiding duplicates |
