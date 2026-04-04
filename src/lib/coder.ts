@@ -19,6 +19,15 @@ export interface CoderWorkspace {
         name: string;
         status: string;
         lifecycle_state: string;
+        display_apps?: string[];
+        apps?: Array<{
+          slug: string;
+          display_name: string;
+          url?: string;
+          hidden?: boolean;
+          subdomain?: boolean;
+          subdomain_name?: string;
+        }>;
       }>;
     }>;
   };
@@ -181,6 +190,37 @@ export async function execOnWorkspace(workspaceName: string, command: string[]):
 /** Open a workspace in VS Code via the Coder CLI. */
 export async function openInVSCode(workspaceName: string): Promise<void> {
   await $`coder open vscode ${workspaceName} --generate-token`.quiet();
+}
+
+/** List all openable apps for a workspace (Dashboard, VS Code, and custom apps). */
+export function listOpenableApps(ws: CoderWorkspace): Array<{ slug: string; label: string }> {
+  const agents = ws.latest_build.resources.flatMap(r => r.agents ?? []);
+  const displayApps = new Set(agents.flatMap(a => a.display_apps ?? []));
+  const apps: Array<{ slug: string; label: string }> = [];
+
+  // Dashboard is always available
+  apps.push({ slug: "dashboard", label: "Dashboard" });
+
+  // VS Code if enabled
+  if (displayApps.has("vscode")) {
+    apps.push({ slug: "vscode", label: "VS Code" });
+  }
+
+  // All non-hidden coder_apps
+  for (const agent of agents) {
+    for (const app of agent.apps ?? []) {
+      if (!app.hidden) {
+        apps.push({ slug: app.slug, label: app.display_name });
+      }
+    }
+  }
+
+  return apps;
+}
+
+/** Open a workspace app via `coder open app`. */
+export async function openWorkspaceApp(workspaceName: string, slug: string): Promise<void> {
+  await $`coder open app ${workspaceName} ${slug}`.quiet();
 }
 
 /** Stream workspace agent logs. Returns the exit code. */

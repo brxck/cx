@@ -102,7 +102,9 @@ Run a one-off command on a workspace without a full SSH session. Useful for quic
 
 #### `coder open [workspace]`
 
-Open a workspace in the Coder dashboard, VS Code Remote, or JetBrains Gateway. Interactively pick the target if multiple options available.
+Open any workspace app — Dashboard, VS Code, or custom apps defined in the Coder template. Available apps are discovered from the workspace's agent config. Interactively pick the app if no `--target` given.
+
+- `--target <slug>` / `-t` — app slug to open directly (e.g. `dashboard`, `vscode`, or any custom app slug)
 
 #### `coder logs [workspace]`
 

@@ -13,7 +13,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
 | `ports [workspace]` | Done | Preset port mappings, interactive multi-select, custom mappings |
 | `exec <workspace> <cmd>` | Done | Runs command via SSH with `--` separator, checks workspace is running |
-| `open [workspace]` | Done | Dashboard (browser) and VS Code targets, interactive picker or `--target` flag |
+| `open [workspace]` | Done | Dynamically lists all workspace apps (Dashboard, VS Code if enabled, plus custom apps from agent config). Interactive picker or `-t` flag. Dashboard and VS Code special-cased; all others delegate to `coder open app`. |
 | `logs [workspace]` | Done | Streams agent logs with `--follow` (default) and `--build` number |
 | `attach [workspace]` | Done | Picks running Coder workspace, resolves template (or default single-pane), builds Cmux layout, saves to store. Detects headless layouts and re-attaches using stored ZMX session names. |
 | `detach [layout]` | Done | Closes Cmux workspace, removes from store and cmux.json, keeps Coder workspace running. Auto-detects from cwd. |
@@ -57,7 +57,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `src/lib/config.ts` | Config load/save for `~/.config/cmux-coder/config.json` (username, agent) |
 | `src/lib/ssh.ts` | Centralized SSH host construction using config — `sshHost()`, `sshHostWithSession()` |
 | `src/lib/ssh-config.ts` | ZMX SSH config management — `hasZmxBlock()`, `ensureZmxBlock()` for idempotent `~/.ssh/config` modification |
-| `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs, exec, VS Code open, log streaming |
+| `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs, exec, VS Code open, log streaming, `listOpenableApps()`, `openWorkspaceApp()` |
 | `src/lib/workspace-picker.ts` | Shared interactive Coder workspace picker and layout picker (`pickLayout`) with fuzzy matching and status badges |
 | `src/lib/session-names.ts` | Generates session names from PNW town names, avoiding duplicates |
 

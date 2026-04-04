@@ -7,13 +7,15 @@ import {
   dashboardUrl,
   openInBrowser,
   openInVSCode,
+  listOpenableApps,
+  openWorkspaceApp,
 } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
 export const openCommand = defineCommand({
   meta: {
     name: "open",
-    description: "Open a workspace in the browser or VS Code",
+    description: "Open a workspace app (dashboard, VS Code, or any workspace app)",
   },
   args: {
     workspace: {
@@ -24,7 +26,7 @@ export const openCommand = defineCommand({
     target: {
       type: "string",
       alias: "t",
-      description: "Target: dashboard, vscode",
+      description: "App to open (e.g. dashboard, vscode, or any app slug)",
       required: false,
     },
   },
@@ -43,15 +45,13 @@ export const openCommand = defineCommand({
       process.exit(1);
     }
 
+    const apps = listOpenableApps(ws);
     let target = args.target as string | undefined;
 
     if (!target) {
       const choice = await p.select({
-        message: "Open in",
-        options: [
-          { value: "dashboard", label: "Dashboard", hint: "browser" },
-          { value: "vscode", label: "VS Code", hint: "coder open vscode" },
-        ],
+        message: `Open ${pc.bold(ws.name)}`,
+        options: apps.map(app => ({ value: app.slug, label: app.label })),
       });
 
       if (p.isCancel(choice)) process.exit(0);
@@ -67,8 +67,8 @@ export const openCommand = defineCommand({
       consola.info(`Opening ${pc.bold(ws.name)} in VS Code...`);
       await openInVSCode(ws.name);
     } else {
-      consola.error(`Unknown target: ${target}. Use "dashboard" or "vscode".`);
-      process.exit(1);
+      consola.info(`Opening ${pc.bold(ws.name)} → ${pc.bold(target)}...`);
+      await openWorkspaceApp(ws.name, target);
     }
   },
 });
