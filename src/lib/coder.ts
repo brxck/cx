@@ -82,8 +82,9 @@ export async function openInBrowser(url: string): Promise<void> {
 }
 
 /** SSH into a workspace (replaces the current process). */
-export async function sshIntoWorkspace(workspaceName: string): Promise<void> {
-  const proc = Bun.spawn(["coder", "ssh", workspaceName], {
+export async function sshIntoWorkspace(workspaceName: string, session?: string): Promise<void> {
+  const host = session ? `${workspaceName}.${session}` : workspaceName;
+  const proc = Bun.spawn(["coder", "ssh", host], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",

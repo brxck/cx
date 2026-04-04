@@ -6,7 +6,7 @@ CLI for orchestrating Cmux layouts on top of Coder remote dev environments.
 
 - **Workspace** — a Coder remote dev environment
 - **Layout** — a Cmux workspace (renamed to avoid collision with Coder's "workspace")
-- **Template** — a declarative definition of a layout: its tabs, panes, sessions, browser surfaces, and associated Coder workspace config
+- **Template** — a cmux-coder config that generates Cmux custom commands for a Coder workspace
 
 ## Command Tree
 
@@ -25,10 +25,6 @@ cmux-coder
 ├── exec <workspace> <cmd>   # run one-off command on workspace
 ├── open [workspace]         # open dashboard or IDE
 ├── logs [workspace]         # stream workspace agent logs
-├── templates
-│   ├── list                 # show available layout templates
-│   ├── create               # capture current layout as a template
-│   └── edit <name>          # edit a template definition
 └── restore                  # re-establish layouts after restart
 ```
 
@@ -38,7 +34,7 @@ cmux-coder
 
 #### `up [layout]`
 
-Spin up a Coder workspace and Cmux layout from a template. If the workspace already exists and is stopped, start it. Wait for the workspace agent to be ready, then orchestrate the Cmux layout: create tabs, split panes, launch SSH sessions, open browser surfaces, start port forwarding.
+Spin up a Coder workspace and Cmux layout from a template. If the workspace already exists and is stopped, start it. Wait for the workspace agent to be ready, then generate and invoke a Cmux custom command that creates the layout with SSH panes, browser surfaces, and port forwarding.
 
 - `--template <name>` — layout template to use
 - `--workspace <name>` — override workspace name
@@ -53,19 +49,19 @@ Tear down a layout. Interactively confirm whether to also stop the Coder workspa
 
 #### `attach [workspace]`
 
-Attach an existing Coder workspace (created outside this tool or from a previous session) into a new Cmux layout. Prompts for which layout template to apply, or uses a default.
+Attach an existing Coder workspace (created outside this tool or from a previous session) into a new Cmux layout. Generates a Cmux custom command for the workspace and invokes it.
 
 - `--template <name>` — layout template to use
 
 #### `detach [layout]`
 
-Remove the Cmux layout but leave the Coder workspace running. Cleans up port forwarding and local session state.
+Remove the Cmux layout but leave the Coder workspace running. Cleans up local session state.
 
 ### Navigation & Discovery
 
 #### `activate [layout]`
 
-Focus/switch to a layout in Cmux via the socket API. If no argument given, interactively pick from active layouts.
+Focus/switch to a layout in Cmux. If no argument given, interactively pick from active layouts.
 
 #### `find <query>`
 
@@ -76,7 +72,7 @@ Locate layouts by name, git branch checked out in the workspace, or Coder templa
 
 #### `status`
 
-Dashboard view showing all layouts with their workspace state (running/stopped/starting), forwarded ports, active sessions, git branch, and health. Non-interactive by default, interactive with `--interactive`.
+Dashboard view showing all layouts with their workspace state (running/stopped/starting), active sessions, git branch, and health. Non-interactive by default, interactive with `--interactive`.
 
 #### `list`
 
@@ -104,62 +100,135 @@ Open a workspace in the Coder dashboard, VS Code Remote, or JetBrains Gateway. I
 
 Stream workspace agent logs. Useful for debugging workspace startup issues or monitoring agent health.
 
-### Layout Templates
-
-#### `templates list`
-
-Show available layout templates with a summary of what each creates (number of tabs, panes, ports, etc).
-
-#### `templates create`
-
-Capture the current Cmux layout as a reusable template. Snapshots tab/pane arrangement, session commands, browser surfaces, and port forwarding config.
-
-#### `templates edit <name>`
-
-Open a template definition for editing. Templates are stored as YAML/TOML files.
-
 #### `restore`
 
-Re-establish all layouts after a machine restart. Reads persisted layout state, starts any stopped workspaces, recreates Cmux layouts, and restarts port forwarding.
+Re-establish all layouts after a restart. Reads persisted layout state, starts any stopped workspaces, and re-invokes the Cmux custom commands.
 
-## Key Features
+## Cmux Integration
 
-### Declarative Layout Templates
+### CLI
 
-Templates are the core abstraction. A template file defines everything needed to go from zero to a fully orchestrated dev environment:
+The `cmux` CLI is installed locally and provides the full API for controlling layouts. Run `cmux` with no arguments for the complete command reference.
 
-```yaml
-name: fullstack
-coder:
-  template: ubuntu-docker    # Coder template to use
-  parameters:                # template parameters
-    cpu: 4
-    memory: 8
-layout:
-  tabs:
-    - name: editor
-      panes:
-        - ssh: true
-          command: "cd ~/project && nvim"
-    - name: servers
-      panes:
-        - ssh: true
-          command: "cd ~/project && make dev"
-          split: horizontal
-        - ssh: true
-          command: "cd ~/project && make watch"
-    - name: shell
-      panes:
-        - ssh: true
-    - name: browser
-      surface: browser
-      url: "http://localhost:8080"
-ports:
-  - 8081:8080   # HTTP
-  - 5433:5432   # PostgreSQL
+### Hierarchy
+
+```
+Window
+└── Workspace (our "layout")
+    └── Pane (a spatial split region)
+        └── Surface (a terminal or browser tab stacked within a pane)
 ```
 
-`cmux-coder up my-project --template fullstack` reads this definition, creates (or starts) the workspace, waits for readiness, then builds out the entire Cmux layout.
+### Custom Commands (`cmux.json`)
+
+Reference: https://cmux.com/docs/custom-commands
+
+Cmux natively supports declarative workspace definitions via `cmux.json` files:
+
+- **Per-project**: `./cmux.json` (takes precedence)
+- **Global**: `~/.config/cmux/cmux.json`
+- Changes are auto-detected, no restart needed
+- Commands appear in the Cmux command palette with searchable keywords
+
+A custom command defines a workspace with a recursive split tree layout, terminal surfaces with commands/cwd/env, browser surfaces with URLs, tab colors, and restart behavior (`ignore`/`recreate`/`confirm`).
+
+**cmux-coder generates these.** Rather than building our own layout engine, `up` and `attach` produce Cmux custom commands that SSH into Coder workspaces with the right pane layout. This gives us native Cmux integration — layouts appear in the command palette, respect Cmux's restart behavior, and work with all Cmux features.
+
+### How It Works
+
+1. User defines a cmux-coder template (Coder workspace config + layout preferences)
+2. `cmux-coder up` creates/starts the Coder workspace
+3. cmux-coder generates a `cmux.json` custom command that:
+   - Creates a workspace with the right split layout
+   - SSH-es into the Coder workspace in each terminal pane (with `-R` socket forwarding)
+   - Opens browser surfaces for web UIs
+   - Sets workspace color/name for identification
+4. The command is invoked, or the user launches it from the Cmux command palette
+
+### Example Generated Command
+
+For a Coder workspace `my-project` with a fullstack layout:
+
+```json
+{
+  "commands": [
+    {
+      "name": "my-project",
+      "keywords": ["coder", "fullstack"],
+      "restart": "ignore",
+      "workspace": {
+        "name": "my-project",
+        "color": "#3b82f6",
+        "layout": {
+          "direction": "horizontal",
+          "split": 0.6,
+          "children": [
+            {
+              "pane": {
+                "surfaces": [
+                  {
+                    "type": "terminal",
+                    "name": "editor",
+                    "command": "ssh -R /tmp/cmux.sock:$CMUX_SOCKET_PATH coder.my-project -t 'cd ~/project && nvim'"
+                  }
+                ]
+              }
+            },
+            {
+              "direction": "vertical",
+              "split": 0.5,
+              "children": [
+                {
+                  "pane": {
+                    "surfaces": [
+                      {
+                        "type": "terminal",
+                        "name": "dev server",
+                        "command": "ssh coder.my-project -t 'cd ~/project && make dev'"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "pane": {
+                    "surfaces": [
+                      {
+                        "type": "browser",
+                        "name": "preview",
+                        "url": "http://localhost:8081"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+## SSH Configuration
+
+We use `coder config-ssh` to generate standard OpenSSH config entries in `~/.ssh/config`. This means all SSH connections go through real `ssh`, giving us full OpenSSH features including Unix socket forwarding.
+
+This enables **remote Cmux control** — an AI agent running on the remote workspace can send commands back to the local Cmux socket.
+
+### Remote Cmux Socket Forwarding
+
+Terminal surfaces in generated Cmux commands include `-R /tmp/cmux.sock:$CMUX_SOCKET_PATH` to forward the local Cmux socket to the remote. On the remote side, any process writing to `/tmp/cmux.sock` talks to the local Cmux instance.
+
+A remote AI agent can then create panes, send commands, update the status bar, send notifications, and log to the sidebar — turning a remote coding agent into a full local workspace orchestrator.
+
+## State Storage (SQLite)
+
+All local state is stored in a single SQLite database at `~/.config/cmux-coder/state.db`, accessed via `bun:sqlite`. Two tables — `layouts` and `sessions` — with cascade deletes for cleanup. Sessions have a nullable layout FK so `ssh` works standalone. Port forwarding state is not persisted; runtime port state comes from the OS, and desired ports come from layout templates. Schema versioned via `PRAGMA user_version`. All API functions are synchronous.
+
+Implementation: `src/lib/store.ts`
+
+## Key Features
 
 ### Active Layout with Auto Port Forwarding
 
@@ -169,7 +238,7 @@ This is opt-in behavior, controlled per-template or globally.
 
 ### Layout State Persistence
 
-Layout-to-workspace associations, session names, forwarded ports, and template references are persisted locally. This enables:
+Layout-to-workspace associations, session names, and template references are persisted locally. This enables:
 
 - `restore` after machine restart
 - `status` showing a complete picture without re-scanning
@@ -179,22 +248,6 @@ Layout-to-workspace associations, session names, forwarded ports, and template r
 ### Git Branch Awareness
 
 Layouts can be tagged with or auto-detect the git branch checked out in their workspace. This powers `find --branch feat/auth` to quickly locate the layout for a specific feature branch. Branch info is refreshed on `activate` or `status`.
-
-### Workspace Lifecycle Hooks
-
-Templates can define hooks that run at key moments:
-
-- `post-start` — after workspace is running (e.g., wait for services, seed database)
-- `pre-down` — before teardown (e.g., commit WIP, push branch)
-- `post-attach` — after attaching to an existing workspace
-
-```yaml
-hooks:
-  post-start:
-    - "cd ~/project && make setup"
-  pre-down:
-    - "cd ~/project && git stash"
-```
 
 ### Health Monitoring
 
@@ -208,7 +261,7 @@ Background process that watches workspace agent health via the Coder API. Notifi
 
 Layouts fall into two categories that affect default behavior:
 
-- **Ephemeral** — one-off task workspaces. `down` defaults to stopping the workspace. No port forwarding persistence.
-- **Persistent** — long-lived development environments. `down` defaults to detach-only. Ports and sessions are restored on `restore`.
+- **Ephemeral** — one-off task workspaces. `down` defaults to stopping the workspace.
+- **Persistent** — long-lived development environments. `down` defaults to detach-only. Sessions are restored on `restore`.
 
 Set per-template or overridden at `up` time.
