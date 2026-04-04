@@ -36,11 +36,10 @@ function healthBadge(ws: CoderWorkspace): string {
 
 export function formatWorkspaceLabel(ws: CoderWorkspace): string {
   const parts = [
-    pc.bold(ws.latest_build.template_version_name),
+    `${pc.bold(ws.name)} ${pc.dim(`(${ws.template_name})`)}`,
     statusBadge(ws),
-    healthBadge(ws),
+    ...(workspaceStatus(ws) === "running" && !ws.health?.healthy ? [healthBadge(ws)] : []),
     pc.dim(`built ${relativeTime(ws.latest_build.created_at)} ago`),
-    pc.dim(ws.name),
   ];
   return parts.join("  ");
 }
