@@ -1,14 +1,14 @@
 {
-  "name": "cmux-coder",
+  "name": "cx",
   "version": "0.1.0",
   "description": "CLI for integrating Cmux with Coder remote dev environments",
   "type": "module",
   "bin": {
-    "cmux-coder": "./bin/cli.ts"
+    "cx": "./bin/cli.ts"
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "build": "bun build src/cli.ts --compile --outfile dist/cmux-coder",
+    "build": "bun build src/cli.ts --compile --outfile dist/cx",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

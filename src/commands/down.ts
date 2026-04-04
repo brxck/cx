@@ -34,7 +34,7 @@ export const downCommand = defineCommand({
     const layout = await resolveLayout(args.layout as string | undefined);
     if (!layout) return;
 
-    p.intro(pc.bold(`cmux-coder down ${pc.cyan(layout.name)}`));
+    p.intro(pc.bold(`cx down ${pc.cyan(layout.name)}`));
 
     // 2. Determine whether to stop the Coder workspace
     const shouldStop = await resolveShouldStop(

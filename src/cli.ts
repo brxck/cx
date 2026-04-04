@@ -39,7 +39,7 @@ const commandGroups = [
 
 const main = defineCommand({
   meta: {
-    name: "cmux-coder",
+    name: "cx",
     version,
     description: "Integrate Cmux with Coder remote dev environments",
   },
@@ -103,7 +103,7 @@ async function customShowUsage(cmd: CommandDef<any>, parent?: CommandDef<any>) {
   }
 
   console.log(
-    `\nUse ${pc.cyan("cmux-coder <command> --help")} for more information about a command.\n`
+    `\nUse ${pc.cyan("cx <command> --help")} for more information about a command.\n`
   );
 }
 

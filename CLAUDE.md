@@ -1,4 +1,4 @@
-# cmux-coder
+# cx
 
 CLI for orchestrating Cmux layouts on top of Coder remote dev environments.
 
@@ -16,7 +16,7 @@ Read these before making changes.
 - **Prompts**: @clack/prompts
 - **Logging**: consola
 - **Colors**: picocolors
-- **State**: bun:sqlite at `~/.config/cmux-coder/state.db`
+- **State**: bun:sqlite at `~/.config/cx/state.db`
 - **Build**: `bun build --compile` for standalone binaries
 
 ## Project layout
@@ -51,4 +51,4 @@ Read these before making changes.
 - Commands follow the pattern: resolve target (arg or interactive picker) → do work with spinners → save state
 - Cmux CLI has no JSON output for `list-workspaces`; we parse text output (see `parseWorkspaceLine` in cmux.ts)
 - Templates use the same recursive split tree format as Cmux custom commands (cmux.json)
-- Generated cmux.json entries are tagged with `_generator: "cmux-coder"` for safe merge/cleanup
+- Generated cmux.json entries are tagged with `_generator: "cx"` for safe merge/cleanup

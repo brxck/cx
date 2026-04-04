@@ -54,7 +54,7 @@ export const upCommand = defineCommand({
       name: args.template as string | undefined,
     });
     if (!resolved) {
-      consola.error("No template found. Create one at ~/.config/cmux-coder/templates/ or add a cmux-coder.json to your project.");
+      consola.error("No template found. Create one at ~/.config/cx/templates/ or add a cx.json to your project.");
       process.exit(1);
     }
     const { template, projectPath } = resolved;
@@ -76,7 +76,7 @@ export const upCommand = defineCommand({
     }
     const layoutName = coderWsName;
 
-    p.intro(pc.bold(`cmux-coder up ${pc.cyan(layoutName)}`));
+    p.intro(pc.bold(`cx up ${pc.cyan(layoutName)}`));
 
     // 2. Create/start Coder workspace
     await ensureCoderWorkspace(coderWsName, template);

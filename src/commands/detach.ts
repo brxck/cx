@@ -23,7 +23,7 @@ export const detachCommand = defineCommand({
     const layout = await resolveLayout(args.layout as string | undefined);
     if (!layout) return;
 
-    p.intro(pc.bold(`cmux-coder detach ${pc.cyan(layout.name)}`));
+    p.intro(pc.bold(`cx detach ${pc.cyan(layout.name)}`));
 
     // 2. Close Cmux workspace
     try {

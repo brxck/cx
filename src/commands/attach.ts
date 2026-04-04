@@ -56,7 +56,7 @@ export const attachCommand = defineCommand({
 
     const layoutName = workspace.name;
 
-    p.intro(pc.bold(`cmux-coder attach ${pc.cyan(layoutName)}`));
+    p.intro(pc.bold(`cx attach ${pc.cyan(layoutName)}`));
 
     // Check for existing headless layout
     const existingLayout = getLayout(layoutName);

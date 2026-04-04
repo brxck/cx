@@ -1,4 +1,4 @@
-# cmux-coder
+# cx
 
 To install dependencies:
 

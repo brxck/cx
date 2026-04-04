@@ -51,7 +51,7 @@ export function isPaneNode(node: LayoutNode): node is PaneNode {
 
 // ── Template management ──
 
-const TEMPLATES_DIR = join(homedir(), ".config", "cmux-coder", "templates");
+const TEMPLATES_DIR = join(homedir(), ".config", "cx", "templates");
 
 function ensureTemplatesDir(): void {
   mkdirSync(TEMPLATES_DIR, { recursive: true });
@@ -93,12 +93,12 @@ export async function saveTemplate(template: TemplateConfig): Promise<void> {
   );
 }
 
-/** Load project-local templates from cmux-coder.json. */
+/** Load project-local templates from cx.json. */
 export async function getProjectTemplates(dir?: string): Promise<{ templates: TemplateConfig[]; projectPath: string } | null> {
   const startDir = dir ?? process.cwd();
 
   // Check the given directory first
-  const localPath = join(startDir, "cmux-coder.json");
+  const localPath = join(startDir, "cx.json");
   if (existsSync(localPath)) {
     const data = await Bun.file(localPath).json() as { templates: TemplateConfig[] };
     return { templates: data.templates, projectPath: startDir };
@@ -109,7 +109,7 @@ export async function getProjectTemplates(dir?: string): Promise<{ templates: Te
     const result = Bun.spawnSync(["git", "-C", startDir, "rev-parse", "--show-toplevel"]);
     const gitRoot = result.stdout.toString().trim();
     if (gitRoot && gitRoot !== startDir) {
-      const rootPath = join(gitRoot, "cmux-coder.json");
+      const rootPath = join(gitRoot, "cx.json");
       if (existsSync(rootPath)) {
         const data = await Bun.file(rootPath).json() as { templates: TemplateConfig[] };
         return { templates: data.templates, projectPath: gitRoot };
@@ -182,8 +182,8 @@ export function deleteTemplate(name: string): boolean {
 
 // ── cmux.json generation ──
 
-/** Marker field to identify cmux-coder-generated commands. */
-const GENERATED_MARKER = "cmux-coder";
+/** Marker field to identify cx-generated commands. */
+const GENERATED_MARKER = "cx";
 
 interface CmuxCommand {
   name: string;
@@ -275,7 +275,7 @@ const CMUX_JSON_PATH = join(homedir(), ".config", "cmux", "cmux.json");
 
 /**
  * Write commands to ~/.config/cmux/cmux.json, merging with existing
- * non-cmux-coder entries.
+ * non-cx entries.
  */
 export async function writeCmuxJson(commands: CmuxCommand[]): Promise<void> {
   let existing: CmuxCommand[] = [];
@@ -284,7 +284,7 @@ export async function writeCmuxJson(commands: CmuxCommand[]): Promise<void> {
     existing = (data.commands ?? []) as CmuxCommand[];
   }
 
-  // Keep non-cmux-coder entries, replace ours
+  // Keep non-cx entries, replace ours
   const preserved = existing.filter((c) => c._generator !== GENERATED_MARKER);
   const merged = [...preserved, ...commands];
 

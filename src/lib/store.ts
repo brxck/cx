@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 
-const CONFIG_DIR = join(homedir(), ".config", "cmux-coder");
+const CONFIG_DIR = join(homedir(), ".config", "cx");
 const DB_PATH = join(CONFIG_DIR, "state.db");
 
 let _db: Database | null = null;

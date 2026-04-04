@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 
-const CONFIG_DIR = join(homedir(), ".config", "cmux-coder");
+const CONFIG_DIR = join(homedir(), ".config", "cx");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
 export interface Config {
@@ -13,7 +13,7 @@ export interface Config {
 export async function loadConfig(): Promise<Config> {
   if (!existsSync(CONFIG_PATH)) {
     throw new Error(
-      `Config not found at ${CONFIG_PATH}\nRun: cmux-coder init`,
+      `Config not found at ${CONFIG_PATH}\nRun: cx init`,
     );
   }
   return Bun.file(CONFIG_PATH).json() as Promise<Config>;

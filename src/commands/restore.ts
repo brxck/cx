@@ -91,7 +91,7 @@ export const restoreCommand = defineCommand({
       return;
     }
 
-    p.intro(pc.bold("cmux-coder restore"));
+    p.intro(pc.bold("cx restore"));
 
     // Ensure SSH config once
     if (toRestore.length > 0) {

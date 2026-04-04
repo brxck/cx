@@ -1,4 +1,4 @@
-# cmux-coder Design
+# cx Design
 
 CLI for orchestrating Cmux layouts on top of Coder remote dev environments.
 
@@ -6,12 +6,12 @@ CLI for orchestrating Cmux layouts on top of Coder remote dev environments.
 
 - **Workspace** — a Coder remote dev environment
 - **Layout** — a Cmux workspace (renamed to avoid collision with Coder's "workspace")
-- **Template** — a cmux-coder config that generates Cmux custom commands for a Coder workspace
+- **Template** — a cx config that generates Cmux custom commands for a Coder workspace
 
 ## Command Tree
 
 ```
-cmux-coder
+cx
 ├── up [layout]              # create workspace + layout from template
 ├── down [layout]            # teardown layout, optionally stop workspace
 ├── attach [workspace]       # wrap existing workspace in a layout
@@ -138,13 +138,13 @@ Cmux natively supports declarative workspace definitions via `cmux.json` files:
 
 A custom command defines a workspace with a recursive split tree layout, terminal surfaces with commands/cwd/env, browser surfaces with URLs, tab colors, and restart behavior (`ignore`/`recreate`/`confirm`).
 
-**cmux-coder generates these.** Rather than building our own layout engine, `up` and `attach` produce Cmux custom commands that SSH into Coder workspaces with the right pane layout. This gives us native Cmux integration — layouts appear in the command palette, respect Cmux's restart behavior, and work with all Cmux features.
+**cx generates these.** Rather than building our own layout engine, `up` and `attach` produce Cmux custom commands that SSH into Coder workspaces with the right pane layout. This gives us native Cmux integration — layouts appear in the command palette, respect Cmux's restart behavior, and work with all Cmux features.
 
 ### How It Works
 
-1. User defines a cmux-coder template (Coder workspace config + layout preferences)
-2. `cmux-coder up` creates/starts the Coder workspace
-3. cmux-coder generates a `cmux.json` custom command that:
+1. User defines a cx template (Coder workspace config + layout preferences)
+2. `cx up` creates/starts the Coder workspace
+3. cx generates a `cmux.json` custom command that:
    - Creates a workspace with the right split layout
    - SSH-es into the Coder workspace in each terminal pane (with `-R` socket forwarding)
    - Opens browser surfaces for web UIs
@@ -302,11 +302,11 @@ Even without `--headless`, the normal `up` flow should create named ZMX sessions
 
 ### Global Templates
 
-JSON files at `~/.config/cmux-coder/templates/*.json`. Each defines a Coder workspace config + Cmux layout tree. Reuses the same recursive split/pane structure as `cmux.json` custom commands.
+JSON files at `~/.config/cx/templates/*.json`. Each defines a Coder workspace config + Cmux layout tree. Reuses the same recursive split/pane structure as `cmux.json` custom commands.
 
 ### Per-Project Templates
 
-A `cmux-coder.json` file in a project root (or git root) defines templates for that project. The file contains a `templates` array of named template configs:
+A `cx.json` file in a project root (or git root) defines templates for that project. The file contains a `templates` array of named template configs:
 
 ```json
 {
@@ -333,7 +333,7 @@ Layouts are associated with the local project directory they were created from (
 
 ## State Storage (SQLite)
 
-All local state is stored in a single SQLite database at `~/.config/cmux-coder/state.db`, accessed via `bun:sqlite`. Two tables — `layouts` and `sessions` — with cascade deletes for cleanup. Sessions have a nullable layout FK so `ssh` works standalone. Layouts track the local project `path` for directory-based auto-detection. Port forwarding state is not persisted; runtime port state comes from the OS, and desired ports come from layout templates. Schema versioned via `PRAGMA user_version`. All API functions are synchronous.
+All local state is stored in a single SQLite database at `~/.config/cx/state.db`, accessed via `bun:sqlite`. Two tables — `layouts` and `sessions` — with cascade deletes for cleanup. Sessions have a nullable layout FK so `ssh` works standalone. Layouts track the local project `path` for directory-based auto-detection. Port forwarding state is not persisted; runtime port state comes from the OS, and desired ports come from layout templates. Schema versioned via `PRAGMA user_version`. All API functions are synchronous.
 
 Implementation: `src/lib/store.ts`
 

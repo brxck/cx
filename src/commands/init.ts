@@ -8,10 +8,10 @@ import { ensureZmxBlock } from "../lib/ssh-config.ts";
 export const initCommand = defineCommand({
   meta: {
     name: "init",
-    description: "Initialize cmux-coder configuration",
+    description: "Initialize cx configuration",
   },
   async run() {
-    p.intro(pc.bold("cmux-coder init"));
+    p.intro(pc.bold("cx init"));
 
     // 1. Try auto-detect username from `coder whoami`
     let detectedUsername: string | null = null;
@@ -47,7 +47,7 @@ export const initCommand = defineCommand({
     if (p.isCancel(agent)) { p.cancel("Cancelled."); process.exit(0); }
 
     await saveConfig({ username, agent: agent || "main" });
-    p.log.success(`Config saved to ${pc.dim("~/.config/cmux-coder/config.json")}`);
+    p.log.success(`Config saved to ${pc.dim("~/.config/cx/config.json")}`);
 
     // 4. Configure SSH for ZMX session persistence
     const s = p.spinner();
