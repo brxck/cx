@@ -1,4 +1,5 @@
 import { $ } from "bun";
+import { sshHost } from "./ssh.ts";
 
 export interface CoderWorkspace {
   id: string;
@@ -168,7 +169,8 @@ export async function ensureSshConfig(): Promise<void> {
 
 /** Run a one-off command on a workspace via SSH. Returns the exit code. */
 export async function execOnWorkspace(workspaceName: string, command: string[]): Promise<number> {
-  const proc = Bun.spawn(["ssh", `coder.${workspaceName}`, "--", ...command], {
+  const host = await sshHost(workspaceName);
+  const proc = Bun.spawn(["ssh", host, "--", ...command], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",

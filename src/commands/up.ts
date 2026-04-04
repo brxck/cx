@@ -94,7 +94,7 @@ export const upCommand = defineCommand({
     }
 
     // 5. Generate cmux.json (for later attachment or custom commands)
-    const cmd = generateCmuxCommand(template, coderWsName);
+    const cmd = await generateCmuxCommand(template, coderWsName);
     await writeCmuxJson([cmd]);
 
     if (args.headless) {

@@ -12,6 +12,7 @@ import {
 import { consola } from "consola";
 import { generateSessionName } from "./session-names.ts";
 import { getSessions } from "./store.ts";
+import { sshHost, sshHostWithSession } from "./ssh.ts";
 
 export interface BuiltLayout {
   cmuxRef: string;
@@ -67,7 +68,8 @@ export async function startHeadlessSessions(
   for (const surface of surfaces) {
     const sessionName = surface.session!;
     const command = surface.command ?? "";
-    await Bun.$`ssh coder.${coderWsName} -- zmx run ${sessionName} ${command}`.quiet();
+    const host = await sshHost(coderWsName);
+    await Bun.$`ssh ${host} -- zmx run ${sessionName} ${command}`.quiet();
     sessions.push({ name: sessionName, command: surface.command });
   }
 
@@ -169,7 +171,7 @@ async function configureSurfaces(
         url: surface.url,
       });
     } else {
-      const sshCmd = buildSshCommand(coderWs, { session: surface.session, command: surface.command });
+      const sshCmd = await buildSshCommand(coderWs, { session: surface.session, command: surface.command });
       if (isFirstSurface) {
         await cmux.send(`${sshCmd}\n`, { workspace: wsRef });
       } else {
@@ -187,8 +189,10 @@ async function configureSurfaces(
   }
 }
 
-function buildSshCommand(coderWs: string, opts?: { session?: string; command?: string }): string {
-  const host = opts?.session ? `coder.${coderWs}.${opts.session}` : `coder.${coderWs}`;
+async function buildSshCommand(coderWs: string, opts?: { session?: string; command?: string }): Promise<string> {
+  const host = opts?.session
+    ? await sshHostWithSession(coderWs, opts.session)
+    : await sshHost(coderWs);
   const remoteCmd = opts?.command ? ` -t '${opts.command}'` : "";
   return `ssh -R /tmp/cmux.sock:$CMUX_SOCKET_PATH ${host}${remoteCmd}`;
 }

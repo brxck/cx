@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, readdirSync, unlinkSync, existsSync } from "node:fs";
+import { sshHost, sshHostWithSession } from "./ssh.ts";
 
 // ── Types ──
 
@@ -219,40 +220,40 @@ interface CmuxSurfaceEntry {
  * Generate a cmux.json command entry from a template.
  * Terminal commands get wrapped with SSH into the Coder workspace.
  */
-export function generateCmuxCommand(
+export async function generateCmuxCommand(
   template: TemplateConfig,
   coderWorkspace: string,
-): CmuxCommand {
+): Promise<CmuxCommand> {
   return {
     name: `${template.name} (${coderWorkspace})`,
     keywords: ["coder", template.name, coderWorkspace],
     color: template.color,
     restart: "ignore",
-    layout: transformLayoutForSsh(template.layout, coderWorkspace),
+    layout: await transformLayoutForSsh(template.layout, coderWorkspace),
     _generator: GENERATED_MARKER,
   };
 }
 
 /** Recursively transform layout, wrapping terminal commands with SSH. */
-function transformLayoutForSsh(node: LayoutNode, coderWorkspace: string): CmuxLayoutNode {
+async function transformLayoutForSsh(node: LayoutNode, coderWorkspace: string): Promise<CmuxLayoutNode> {
   if (isSplitNode(node)) {
     return {
       direction: node.direction,
       split: node.split,
       children: [
-        transformLayoutForSsh(node.children[0], coderWorkspace),
-        transformLayoutForSsh(node.children[1], coderWorkspace),
+        await transformLayoutForSsh(node.children[0], coderWorkspace),
+        await transformLayoutForSsh(node.children[1], coderWorkspace),
       ],
     };
   }
 
   return {
     pane: {
-      surfaces: node.pane.surfaces.map((s) => {
+      surfaces: await Promise.all(node.pane.surfaces.map(async (s) => {
         if (s.type === "terminal") {
           const host = s.session
-            ? `coder.${coderWorkspace}.${s.session}`
-            : `coder.${coderWorkspace}`;
+            ? await sshHostWithSession(coderWorkspace, s.session)
+            : await sshHost(coderWorkspace);
           const remoteCmd = s.command ? ` -t '${s.command}'` : "";
           return {
             type: "terminal" as const,
@@ -265,7 +266,7 @@ function transformLayoutForSsh(node: LayoutNode, coderWorkspace: string): CmuxLa
           name: s.name,
           url: s.url,
         };
-      }),
+      })),
     },
   };
 }

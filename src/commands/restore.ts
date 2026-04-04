@@ -29,6 +29,7 @@ import {
   collectTerminalSurfaces,
   startPortForwarding,
 } from "../lib/layout-builder.ts";
+import { sshHost } from "../lib/ssh.ts";
 
 export const restoreCommand = defineCommand({
   meta: {
@@ -177,7 +178,8 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   // 5. Restart dead sessions
   for (const s of sessionsToRestart) {
     const cmd = s.command ?? "bash";
-    await Bun.$`ssh coder.${layout.coder_ws} -- zmx run ${s.name} ${cmd}`.quiet();
+    const host = await sshHost(layout.coder_ws);
+    await Bun.$`ssh ${host} -- zmx run ${s.name} ${cmd}`.quiet();
   }
 
   // 6. Build Cmux layout (connects to existing/restarted sessions)
@@ -202,7 +204,7 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   }
 
   // 10. Regenerate cmux.json entry
-  const cmd = generateCmuxCommand(effectiveTemplate, layout.coder_ws);
+  const cmd = await generateCmuxCommand(effectiveTemplate, layout.coder_ws);
   await writeCmuxJson([cmd]);
 
   spinner.stop(`Restored ${pc.bold(layout.name)} — ${pc.cyan(cmuxRef)}`);
@@ -210,7 +212,8 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
 
 async function probeLiveSessions(coderWs: string): Promise<Set<string>> {
   try {
-    const output = await Bun.$`ssh coder.${coderWs} -- zmx list --short`.quiet().text();
+    const host = await sshHost(coderWs);
+    const output = await Bun.$`ssh ${host} -- zmx list --short`.quiet().text();
     const names = output.trim().split("\n").filter(Boolean);
     return new Set(names);
   } catch {

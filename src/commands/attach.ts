@@ -128,7 +128,7 @@ export const attachCommand = defineCommand({
     });
 
     // 7. Generate cmux.json
-    const cmd = generateCmuxCommand(template, workspace.name);
+    const cmd = await generateCmuxCommand(template, workspace.name);
     await writeCmuxJson([cmd]);
 
     p.outro(

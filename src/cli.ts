@@ -11,6 +11,7 @@ import { detachCommand } from "./commands/detach.ts";
 import { activateCommand } from "./commands/activate.ts";
 import { findCommand } from "./commands/find.ts";
 import { restoreCommand } from "./commands/restore.ts";
+import { initCommand } from "./commands/init.ts";
 
 const main = defineCommand({
   meta: {
@@ -33,6 +34,7 @@ const main = defineCommand({
     activate: activateCommand,
     find: findCommand,
     restore: restoreCommand,
+    init: initCommand,
   },
 });
 
