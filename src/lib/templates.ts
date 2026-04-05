@@ -5,6 +5,11 @@ import { sshHost, sshHostWithSession } from "./ssh.ts";
 
 // ── Types ──
 
+export interface TemplateVariable {
+  default?: string;
+  description?: string;
+}
+
 export interface TemplateConfig {
   name: string;
   coder: {
@@ -15,6 +20,7 @@ export interface TemplateConfig {
   type: "ephemeral" | "persistent";
   color?: string;
   ports?: string[];
+  variables?: Record<string, TemplateVariable>;
   layout: LayoutNode;
 }
 

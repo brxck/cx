@@ -10,6 +10,7 @@ import {
   listTemplatesAsync,
   getProjectTemplates,
 } from "../lib/templates.ts";
+import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
 import { saveLayout, updateLayout, getLayout, getSessionsForLayout, recordSession } from "../lib/store.ts";
 import { buildCmuxLayout, startPortForwarding, collectTerminalSurfaces } from "../lib/layout-builder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
@@ -34,6 +35,10 @@ export const attachCommand = defineCommand({
       type: "boolean",
       description: "Skip port forwarding",
       default: false,
+    },
+    vars: {
+      type: "string",
+      description: "Template variables as key=value pairs (e.g. --vars \"branch=main,port=3000\")",
     },
   },
   async run({ args }) {
@@ -129,6 +134,10 @@ export const attachCommand = defineCommand({
         projectPath = picked.source === "project" ? (project?.projectPath ?? null) : null;
       }
     }
+
+    // Resolve template variables before anything consumes commands/URLs
+    const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
+    await resolveVariables(template, cliVars);
 
     // If re-attaching a headless layout, inject stored session names
     if (isHeadlessReattach) {

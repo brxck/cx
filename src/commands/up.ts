@@ -17,6 +17,7 @@ import {
   writeCmuxJson,
   type TemplateConfig,
 } from "../lib/templates.ts";
+import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
 import { saveLayout, recordSession } from "../lib/store.ts";
 import { buildCmuxLayout, startHeadlessSessions, startPortForwarding } from "../lib/layout-builder.ts";
 
@@ -47,6 +48,10 @@ export const upCommand = defineCommand({
       description: "Start ZMX sessions without creating a Cmux layout",
       default: false,
     },
+    vars: {
+      type: "string",
+      description: "Template variables as key=value pairs (e.g. --vars \"branch=main,port=3000\")",
+    },
   },
   async run({ args }) {
     // 1. Resolve template (project-local → named → interactive picker)
@@ -58,6 +63,10 @@ export const upCommand = defineCommand({
       process.exit(1);
     }
     const { template, projectPath } = resolved;
+
+    // Resolve template variables before anything consumes commands/URLs
+    const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
+    await resolveVariables(template, cliVars);
 
     let coderWsName = args.workspace as string | undefined;
     if (!coderWsName) {

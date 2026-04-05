@@ -16,6 +16,7 @@ import {
   writeCmuxJson,
   type TemplateConfig,
 } from "../lib/templates.ts";
+import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
 import {
   getAllLayouts,
   getSessionsForLayout,
@@ -47,6 +48,10 @@ export const restoreCommand = defineCommand({
       alias: "n",
       description: "Show what would be restored without doing it",
       default: false,
+    },
+    vars: {
+      type: "string",
+      description: "Template variables as key=value pairs (e.g. --vars \"branch=main,port=3000\")",
     },
   },
   async run({ args }) {
@@ -104,9 +109,11 @@ export const restoreCommand = defineCommand({
     // Restore each layout sequentially
     const results = { restored: 0, skipped: 0, failed: 0 };
 
+    const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
+
     for (const layout of toRestore) {
       try {
-        await restoreLayout(layout);
+        await restoreLayout(layout, cliVars);
         results.restored++;
       } catch (err) {
         consola.warn(`Failed to restore ${layout.name}: ${err}`);
@@ -120,7 +127,7 @@ export const restoreCommand = defineCommand({
   },
 });
 
-async function restoreLayout(layout: LayoutEntry): Promise<void> {
+async function restoreLayout(layout: LayoutEntry, cliVars: Record<string, string> = {}): Promise<void> {
   const spinner = p.spinner();
   spinner.start(`Restoring ${pc.bold(layout.name)}`);
 
@@ -156,6 +163,9 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   if (!template) {
     p.log.warn(`Template "${layout.template}" not found — using default single-pane`);
   }
+
+  // Resolve template variables
+  await resolveVariables(effectiveTemplate, cliVars);
 
   // 3. Probe remote for live ZMX sessions
   const storedSessions = getSessionsForLayout(layout.name);
