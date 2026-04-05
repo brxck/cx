@@ -7,6 +7,8 @@ import {
   generateCmuxCommand,
   writeCmuxJson,
   type TemplateConfig,
+  listTemplatesAsync,
+  getProjectTemplates,
 } from "../lib/templates.ts";
 import { saveLayout, updateLayout, getLayout, getSessionsForLayout, recordSession } from "../lib/store.ts";
 import { buildCmuxLayout, startPortForwarding, collectTerminalSurfaces } from "../lib/layout-builder.ts";
@@ -66,17 +68,21 @@ export const attachCommand = defineCommand({
     let template: TemplateConfig;
     let projectPath: string | null = null;
 
-    const resolved = await resolveTemplate({
-      name: args.template as string | undefined,
-    });
-
-    if (resolved) {
-      template = resolved.template;
-      projectPath = resolved.projectPath;
+    if (args.template) {
+      // Explicit --template flag: resolve by name
+      const resolved = await resolveTemplate({
+        name: args.template as string,
+      });
+      if (resolved) {
+        template = resolved.template;
+        projectPath = resolved.projectPath;
+      } else {
+        p.log.error(`Template ${pc.bold(args.template as string)} not found`);
+        process.exit(1);
+      }
     } else {
-      // Default single-pane layout
-      p.log.info("No template found — using default single-pane layout");
-      template = {
+      // Interactive picker with default option
+      const defaultTemplate: TemplateConfig = {
         name: "default",
         coder: { template: workspace.template_name },
         type: "persistent",
@@ -86,6 +92,42 @@ export const attachCommand = defineCommand({
           },
         },
       };
+
+      const project = await getProjectTemplates();
+      const projectTemplates = project?.templates ?? [];
+      const globalTemplates = await listTemplatesAsync();
+
+      type PickerEntry = { template: TemplateConfig; source: "project" | "global" | "default" };
+      const entries: PickerEntry[] = [
+        ...projectTemplates.map((t) => ({ template: t, source: "project" as const })),
+        ...globalTemplates.map((t) => ({ template: t, source: "global" as const })),
+        { template: defaultTemplate, source: "default" as const },
+      ];
+
+      if (entries.length === 1) {
+        // Only the default — use it directly
+        template = defaultTemplate;
+      } else {
+        const choice = await p.select({
+          message: "Select a template",
+          options: entries.map((e) => ({
+            value: e,
+            label:
+              e.source === "default"
+                ? `${pc.bold("default")}  ${pc.dim("single pane")}`
+                : `${pc.bold(e.template.name)}  ${pc.dim(e.template.coder.template)}  ${pc.dim(e.template.type)}${e.source === "project" ? `  ${pc.dim("(project)")}` : ""}`,
+          })),
+        });
+
+        if (p.isCancel(choice)) {
+          p.cancel("Cancelled.");
+          process.exit(0);
+        }
+
+        const picked = choice as PickerEntry;
+        template = picked.template;
+        projectPath = picked.source === "project" ? (project?.projectPath ?? null) : null;
+      }
     }
 
     // If re-attaching a headless layout, inject stored session names
@@ -107,17 +149,13 @@ export const attachCommand = defineCommand({
     // 4. Build Cmux layout
     const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, workspace.name);
 
-    for (const session of sessions) {
-      recordSession(workspace.name, session.name, layoutName);
-    }
-
     // 5. Port forwarding
     const noPorts = args["no-ports"] as boolean;
     if (!noPorts && template.ports?.length) {
       startPortForwarding(workspace.name, template.ports);
     }
 
-    // 6. Save to store
+    // 6. Save to store (must happen before recordSession due to FK constraint)
     saveLayout({
       name: layoutName,
       cmux_id: cmuxRef,
@@ -126,6 +164,10 @@ export const attachCommand = defineCommand({
       type: template.type,
       path: projectPath,
     });
+
+    for (const session of sessions) {
+      recordSession(workspace.name, session.name, layoutName);
+    }
 
     // 7. Generate cmux.json
     const cmd = await generateCmuxCommand(template, workspace.name);
