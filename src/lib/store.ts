@@ -7,6 +7,7 @@ const CONFIG_DIR = join(homedir(), ".config", "cx");
 const DB_PATH = join(CONFIG_DIR, "state.db");
 
 let _db: Database | null = null;
+let _dbPath: string | null = null;
 
 const SCHEMA_V1 = `
 CREATE TABLE IF NOT EXISTS layouts (
@@ -47,12 +48,24 @@ function migrate(db: Database): void {
 
 export function getDb(): Database {
   if (_db) return _db;
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  _db = new Database(DB_PATH);
+  const dbPath = _dbPath ?? DB_PATH;
+  if (dbPath !== ":memory:") {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+  }
+  _db = new Database(dbPath);
   _db.exec("PRAGMA journal_mode = WAL");
   _db.exec("PRAGMA foreign_keys = ON");
   migrate(_db);
   return _db;
+}
+
+/** @internal Test helper — closes and resets the singleton DB. */
+export function _resetDb(path?: string): void {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+  _dbPath = path ?? null;
 }
 
 // --- Types ---

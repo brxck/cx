@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "bun run src/cli.ts",
     "build": "bun build src/cli.ts --compile --outfile dist/cx",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "release": "bun run typecheck && bun run build"
   },
