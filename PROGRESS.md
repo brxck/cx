@@ -12,6 +12,8 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `list` | Done | Interactive workspace picker with fuzzy filter, SSH and dashboard actions |
 | `ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
 | `ports [workspace]` | Done | Preset port mappings, interactive multi-select, custom mappings |
+| `forward [layout]` | Done | Start port forwarding from layout template config. Resolves by name, cwd, or picker. Detects already-forwarded ports. |
+| `unforward [layout]` | Done | Stop port forwarding by killing `coder port-forward` process. Resolves by layout name, workspace name, cwd, or picker. |
 | `exec <workspace> <cmd>` | Done | Runs command via SSH with `--` separator, checks workspace is running |
 | `open [workspace]` | Done | Dynamically lists all workspace apps (Dashboard, VS Code if enabled, plus custom apps from agent config). Interactive picker or `-t` flag. Dashboard and VS Code special-cased; all others delegate to `coder open app`. |
 | `logs [workspace]` | Done | Streams agent logs with `--follow` (default) and `--build` number |
@@ -37,12 +39,12 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | Layout state persistence | Done | SQLite store with layouts and sessions tables |
 | Ephemeral vs persistent layout types | Done | Schema, templates, and `down` behavior all wired up |
 | Cmux sidebar integration | Done | `sidebarState()` in cmux.ts, parsed for git branch/dirty, PR, Claude status, ports |
-| Port-forward detection | Done | Parses `ps aux` for running `coder port-forward` processes |
+| Port-forward detection | Done | Shared `src/lib/ports.ts` — `detectPortForwards()`, `detectPortForwardMap()`, `stopPortForwards()` |
 | Headless mode | Done | `up --headless` starts ZMX sessions without Cmux layout; `attach` re-connects to headless sessions; `status` shows `⊘ headless` badge |
 | ZMX session tracking | Done | All terminal surfaces get named ZMX sessions, recorded in store, reconnectable across layout rebuilds |
 | Config file | Done | `~/.config/cx/config.json` stores `username` and optional `agent` (default `"main"`). Required for SSH host construction. |
 | Centralized SSH host builder | Done | `src/lib/ssh.ts` — `sshHost()` builds `{agent}.{workspace}.{username}.coder`, `sshHostWithSession()` appends `.{session}`. All callsites migrated from old `coder.{workspace}` format. |
-| Active layout auto port forwarding | Not started | Depends on Cmux focus detection |
+| Manual port forward control | Done | `forward`/`unforward` commands replace auto port forwarding design |
 | Git branch awareness | Partial | Live git data from Cmux sidebar in `status`; not yet stored/searchable |
 | Health monitoring | Not started | |
 
@@ -54,6 +56,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
 | `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions, v2 schema |
 | `src/lib/layout-builder.ts` | Shared layout building: `buildCmuxLayout()` (tree walker + Cmux workspace creation, returns sessions), `startHeadlessSessions()`, `collectTerminalSurfaces()`, `assignSessionNames()`, `startPortForwarding()` |
+| `src/lib/ports.ts` | Port-forward process detection (`detectPortForwards`, `detectPortForwardMap`) and killing (`stopPortForwards`) |
 | `src/lib/config.ts` | Config load/save for `~/.config/cx/config.json` (username, agent) |
 | `src/lib/ssh.ts` | Centralized SSH host construction using config — `sshHost()`, `sshHostWithSession()` |
 | `src/lib/ssh-config.ts` | ZMX SSH config management — `hasZmxBlock()`, `ensureZmxBlock()` for idempotent `~/.ssh/config` modification |

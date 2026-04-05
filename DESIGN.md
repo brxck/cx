@@ -24,6 +24,8 @@ cx
     ├── list                 # list workspaces (enhanced)
     ├── ssh [workspace]      # SSH with session management
     ├── ports [workspace]    # port forwarding with presets
+    ├── forward [layout]     # start port forwarding from template
+    ├── unforward [layout]   # stop port forwarding
     ├── exec <workspace> <cmd> # run one-off command on workspace
     ├── open [workspace]     # open dashboard or IDE
     └── logs [workspace]     # stream workspace agent logs
@@ -339,11 +341,15 @@ Implementation: `src/lib/store.ts`
 
 ## Key Features
 
-### Active Layout with Auto Port Forwarding
+### Manual Port Forwarding
 
-The currently focused Cmux layout is the "active" layout. When a layout becomes active, its configured ports are automatically forwarded. When switching to a different layout, the previous layout's port forwarding can be stopped to free local ports and avoid collisions.
+Port forwarding is manually controlled:
 
-This is opt-in behavior, controlled per-template or globally.
+- `cx forward [layout]` — start forwarding ports defined in the layout's template
+- `cx unforward [layout]` — stop forwarding for a layout/workspace
+- `cx ports [workspace]` — interactive ad-hoc port picker (existing)
+
+`cx up` starts port forwarding automatically (unless `--no-ports`). `cx down` does not stop it — use `cx unforward` explicitly.
 
 ### Layout State Persistence
 

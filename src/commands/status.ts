@@ -20,6 +20,7 @@ import {
   getAllLayouts,
   getSessionsForLayout,
 } from "../lib/store.ts";
+import { detectPortForwardMap } from "../lib/ports.ts";
 
 // ── Types ──
 
@@ -48,31 +49,6 @@ interface LayoutStatus {
 }
 
 // ── Helpers ──
-
-async function detectPortForwards(): Promise<Map<string, string[]>> {
-  const map = new Map<string, string[]>();
-  try {
-    const result =
-      await Bun.$`ps aux`.quiet().text();
-    for (const line of result.split("\n")) {
-      if (!line.includes("coder port-forward")) continue;
-      // Extract workspace name and port mappings
-      const wsMatch = line.match(/coder port-forward\s+(\S+)/);
-      if (!wsMatch) continue;
-      const wsName = wsMatch[1]!;
-      const portMatches = [...line.matchAll(/--tcp\s+(\S+)/g)];
-      const ports = portMatches.map((m) => m[1]!);
-      if (ports.length > 0) {
-        const existing = map.get(wsName) ?? [];
-        existing.push(...ports);
-        map.set(wsName, existing);
-      }
-    }
-  } catch {
-    // ps failed — no port forward info
-  }
-  return map;
-}
 
 async function fetchSidebarStates(
   layouts: LayoutEntry[],
@@ -308,7 +284,7 @@ export const statusCommand = defineCommand({
         cmuxAlive
           ? listCmuxWorkspaces().catch((): CmuxWorkspace[] => [])
           : Promise.resolve([] as CmuxWorkspace[]),
-        detectPortForwards(),
+        detectPortForwardMap(),
       ]);
 
     if (!cmuxAlive && !args.json) {

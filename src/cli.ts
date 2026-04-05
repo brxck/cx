@@ -17,6 +17,8 @@ import { execCommand } from "./commands/exec.ts";
 import { openCommand } from "./commands/open.ts";
 import { logsCommand } from "./commands/logs.ts";
 import { initCommand } from "./commands/init.ts";
+import { forwardCommand } from "./commands/forward.ts";
+import { unforwardCommand } from "./commands/unforward.ts";
 
 const commandGroups = [
   {
@@ -29,7 +31,7 @@ const commandGroups = [
   },
   {
     label: "Workspace",
-    commands: ["list", "ssh", "ports", "exec", "open", "logs"],
+    commands: ["list", "ssh", "ports", "forward", "unforward", "exec", "open", "logs"],
   },
   {
     label: "Configuration",
@@ -58,6 +60,8 @@ const main = defineCommand({
     exec: execCommand,
     open: openCommand,
     logs: logsCommand,
+    forward: forwardCommand,
+    unforward: unforwardCommand,
     init: initCommand,
   },
 });
