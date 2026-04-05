@@ -42,21 +42,19 @@ export const initCommand = defineCommand({
       username = input;
     }
 
-    // 3. Agent name (default "main")
-    const agent = await p.text({ message: "Default agent name", placeholder: "main" });
-    if (p.isCancel(agent)) { p.cancel("Cancelled."); process.exit(0); }
-
-    await saveConfig({ username, agent: agent || "main" });
+    await saveConfig({ username, agent: "main" });
     p.log.success(`Config saved to ${pc.dim("~/.config/cx/config.json")}`);
 
     // 4. Configure SSH for ZMX session persistence
     const s = p.spinner();
     s.start("Configuring SSH...");
     await ensureSshConfig();
-    const inserted = await ensureZmxBlock();
-    s.stop(inserted
-      ? "SSH configured with ZMX session persistence"
-      : "SSH configured (ZMX block already present)");
+    const zmxResult = await ensureZmxBlock();
+    s.stop(
+      zmxResult === "inserted" ? "SSH configured with ZMX session persistence"
+      : zmxResult === "updated" ? "SSH config updated to latest format"
+      : "SSH configured (already up to date)",
+    );
 
     p.outro("Ready to go!");
   },
