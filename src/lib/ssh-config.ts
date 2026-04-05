@@ -5,7 +5,8 @@ const SSH_CONFIG = join(homedir(), ".ssh", "config");
 const START_MARKER = "# --- START ZMX ---";
 const END_MARKER = "LogLevel ERROR";
 
-const ZMX_BLOCK = `# --- START ZMX ---
+function zmxBlock(coderPath: string): string {
+  return `# --- START ZMX ---
 # SSH config for Coder workspaces with ZMX session persistence.
 #
 # Plain SSH (no ZMX):
@@ -23,7 +24,7 @@ const ZMX_BLOCK = `# --- START ZMX ---
 
 # Plain Coder SSH — no ZMX, clean shell (used by cmux ssh, direct connections)
 Match host *.coder,!coder-vscode.*
-    ProxyCommand bash -c 'ws=$(echo %h | sed "s/^[^.]*\\.\\([^.]*\\).*/\\1/"); exec coder ssh --stdio --ssh-host-prefix coder. "coder.$ws"'
+    ProxyCommand bash -c 'ws=$(echo %h | sed "s/^[^.]*\\.\\([^.]*\\).*/\\1/"); exec ${coderPath} ssh --stdio --ssh-host-prefix coder. "coder.$ws"'
     ControlPath ~/.ssh/cm-%r@%h:%p
     ControlMaster auto
     ControlPersist 10m
@@ -34,7 +35,7 @@ Match host *.coder,!coder-vscode.*
 
 # ZMX session persistence — host has a session name suffix after .coder.
 Match host *.coder.*,!coder-vscode.*
-    ProxyCommand bash -c 'ws=$(echo %h | sed "s/^[^.]*\\.\\([^.]*\\).*/\\1/"); exec coder ssh --stdio --ssh-host-prefix coder. "coder.$ws"'
+    ProxyCommand bash -c 'ws=$(echo %h | sed "s/^[^.]*\\.\\([^.]*\\).*/\\1/"); exec ${coderPath} ssh --stdio --ssh-host-prefix coder. "coder.$ws"'
     RemoteCommand session=%k; zmx attach "$(echo $session | sed 's/.*\\.//')"
     RequestTTY yes
     ControlPath ~/.ssh/cm-%r@%h:%p
@@ -44,8 +45,19 @@ Match host *.coder.*,!coder-vscode.*
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
     LogLevel ERROR`;
+}
 
 const CODER_MARKER = "# ------------START-CODER";
+
+/** Resolve the absolute path to the coder binary. */
+async function resolveCoderPath(): Promise<string> {
+  try {
+    const result = await Bun.$`which coder`.quiet().text();
+    return result.trim();
+  } catch {
+    return "/usr/local/bin/coder";
+  }
+}
 
 /** Check if the ZMX block is already present in ~/.ssh/config. */
 export async function hasZmxBlock(): Promise<boolean> {
@@ -64,6 +76,9 @@ export async function ensureZmxBlock(): Promise<"inserted" | "updated" | false> 
   const sshDir = join(homedir(), ".ssh");
   await Bun.$`mkdir -p ${sshDir}`.quiet();
 
+  const coderPath = await resolveCoderPath();
+  const block = zmxBlock(coderPath);
+
   const file = Bun.file(SSH_CONFIG);
   const exists = await file.exists();
   const content = exists ? await file.text() : "";
@@ -76,19 +91,19 @@ export async function ensureZmxBlock(): Promise<"inserted" | "updated" | false> 
     if (afterStart === -1) return false;
     // There may be two Match blocks; find the final END_MARKER
     let endIdx = afterStart;
-    let searchFrom = afterStart + END_MARKER.length;
+    const searchFrom = afterStart + END_MARKER.length;
     const nextMarkerOrCoder = content.indexOf("\n#", searchFrom);
     const nextEnd = content.indexOf(END_MARKER, searchFrom);
     if (nextEnd !== -1 && (nextMarkerOrCoder === -1 || nextEnd < nextMarkerOrCoder)) {
       endIdx = nextEnd;
     }
     const existingBlock = content.slice(startIdx, endIdx + END_MARKER.length);
-    if (existingBlock === ZMX_BLOCK) return false;
+    if (existingBlock === block) return false;
 
     // Replace the old block
     const before = content.slice(0, startIdx);
     const after = content.slice(endIdx + END_MARKER.length);
-    await Bun.write(SSH_CONFIG, before + ZMX_BLOCK + after);
+    await Bun.write(SSH_CONFIG, before + block + after);
     return "updated";
   }
 
@@ -100,10 +115,10 @@ export async function ensureZmxBlock(): Promise<"inserted" | "updated" | false> 
     // Insert before the Coder-managed section
     const before = content.slice(0, coderIndex);
     const after = content.slice(coderIndex);
-    result = before + ZMX_BLOCK + "\n\n" + after;
+    result = before + block + "\n\n" + after;
   } else {
     // No Coder section — prepend
-    result = ZMX_BLOCK + "\n\n" + content;
+    result = block + "\n\n" + content;
   }
 
   await Bun.write(SSH_CONFIG, result);
