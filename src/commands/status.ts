@@ -19,6 +19,7 @@ import {
   type LayoutEntry,
   getAllLayouts,
   getSessionsForLayout,
+  updateLayout,
 } from "../lib/store.ts";
 import { detectPortForwardMap } from "../lib/ports.ts";
 
@@ -295,6 +296,14 @@ export const statusCommand = defineCommand({
     const sidebarStates = cmuxAlive
       ? await fetchSidebarStates(layouts, cmuxWorkspaces)
       : new Map<string, SidebarState>();
+
+    // Opportunistically persist branch data from live sidebar
+    for (const layout of layouts) {
+      const sidebar = sidebarStates.get(layout.name);
+      if (sidebar?.gitBranch && sidebar.gitBranch !== layout.branch) {
+        try { updateLayout(layout.name, { branch: sidebar.gitBranch }); } catch {}
+      }
+    }
 
     // 3. Build unified statuses
     let layoutStatuses = buildLayoutStatuses(

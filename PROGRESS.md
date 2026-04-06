@@ -45,7 +45,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | Config file | Done | `~/.config/cx/config.json` stores `username` and optional `agent` (default `"main"`). Required for SSH host construction. |
 | Centralized SSH host builder | Done | `src/lib/ssh.ts` — `sshHost()` builds `{agent}.{workspace}.{username}.coder`, `sshHostWithSession()` appends `.{session}`. All callsites migrated from old `coder.{workspace}` format. |
 | Manual port forward control | Done | `forward`/`unforward` commands replace auto port forwarding design |
-| Git branch awareness | Partial | Live git data from Cmux sidebar in `status`; not yet stored/searchable |
+| Git branch awareness | Done | Live sidebar data persisted to DB opportunistically by `status`, `activate`, and `find --branch`. Enables offline branch search. |
 | Health monitoring | Not started | |
 
 ## Libraries

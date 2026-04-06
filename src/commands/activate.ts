@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
 import * as cmux from "../lib/cmux.ts";
-import { getAllLayouts, getLayout, touchLayout, type LayoutEntry } from "../lib/store.ts";
+import { getAllLayouts, getLayout, touchLayout, updateLayout, type LayoutEntry } from "../lib/store.ts";
 import { fuzzyMatch, pickLayout } from "../lib/workspace-picker.ts";
 
 export const activateCommand = defineCommand({
@@ -31,6 +31,16 @@ export const activateCommand = defineCommand({
     }
 
     touchLayout(layout.name);
+
+    // Opportunistically persist branch from sidebar
+    try {
+      const output = await cmux.sidebarState(layout.cmux_id);
+      const sidebar = cmux.parseSidebarState(output);
+      if (sidebar.gitBranch) {
+        updateLayout(layout.name, { branch: sidebar.gitBranch });
+      }
+    } catch {}
+
     consola.success(`Switched to ${pc.bold(layout.name)}`);
   },
 });

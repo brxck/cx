@@ -8,6 +8,7 @@ import {
   findLayoutsByBranch,
   getLayoutsByPath,
   touchLayout,
+  updateLayout,
   type LayoutEntry,
 } from "../lib/store.ts";
 import { fuzzyMatch, pickLayout } from "../lib/workspace-picker.ts";
@@ -115,6 +116,7 @@ async function findByBranch(query: string): Promise<LayoutEntry[]> {
         const output = await sidebarState(layout.cmux_id);
         const state = parseSidebarState(output);
         if (state.gitBranch && fuzzyMatch(query, state.gitBranch)) {
+          try { updateLayout(layout.name, { branch: state.gitBranch }); } catch {}
           return layout;
         }
       } catch {}
