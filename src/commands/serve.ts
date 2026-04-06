@@ -9,6 +9,8 @@ import { handleDown } from "../api/down.ts";
 import { handleStop } from "../api/stop.ts";
 import { handleApps } from "../api/apps.ts";
 import { handleStart } from "../api/start.ts";
+import { handleUpdate } from "../api/update.ts";
+import { handleRestart } from "../api/restart.ts";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -97,6 +99,20 @@ export const serveCommand = defineCommand({
                   break;
                 }
                 response = await handleStart(req);
+                break;
+              case "/api/update":
+                if (req.method !== "POST") {
+                  response = Response.json({ error: "Method not allowed" }, { status: 405 });
+                  break;
+                }
+                response = await handleUpdate(req);
+                break;
+              case "/api/restart":
+                if (req.method !== "POST") {
+                  response = Response.json({ error: "Method not allowed" }, { status: 405 });
+                  break;
+                }
+                response = await handleRestart(req);
                 break;
               default:
                 response = Response.json({ error: "Not found" }, { status: 404 });

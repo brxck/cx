@@ -70,7 +70,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 |---|---|---|
 | CLI scaffold (citty) | Done | Root command with subcommands in `src/cli.ts`, grouped help output (Lifecycle, Navigation, Workspace, Configuration) |
 | Build (bun compile) | Done | Standalone binary to `dist/` |
-| SQLite state database | Done | `~/.config/cx/state.db`, v2 schema with `path` column |
+| SQLite state database | Done | `~/.cx/state.db`, v2 schema with `path` column |
 | Cmux CLI integration | Done | `src/lib/cmux.ts` wraps all needed cmux commands |
 | Template storage (global) | Done | `~/.config/cx/templates/*.json` |
 | Template storage (per-project) | Done | `cx.json` at project root with `templates` array |

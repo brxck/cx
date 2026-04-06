@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import type { WorkspaceInfo, AppEntry } from "../api";
-import { stopWorkspace, startWorkspace, fetchApps, tearDown } from "../api";
+import { stopWorkspace, startWorkspace, fetchApps, tearDown, streamUpdate, streamRestart } from "../api";
 import { StatusBadge } from "./StatusBadge";
 import { IconMenu, type MenuItem } from "./IconMenu";
 import { TerminalSquare, ExternalLink, MoreVertical } from "lucide-react";
+import type { UpEvent } from "../api";
 
 const card: React.CSSProperties = {
   background: "var(--surface)",
@@ -24,6 +25,8 @@ export function WorkspaceCard({
 }) {
   const [toggling, setToggling] = useState(false);
   const [tearing, setTearing] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [apps, setApps] = useState<{ dashboard: string; terminal: string; apps: AppEntry[] } | null>(null);
 
   const isRunning = workspace.status === "running";
@@ -48,6 +51,28 @@ export function WorkspaceCard({
     setTearing(true);
     await tearDown(workspace.name, true);
     setTearing(false);
+    onRefresh();
+  };
+
+  const handleUpdate = async () => {
+    setUpdating(true);
+    try {
+      for await (const event of streamUpdate(workspace.name)) {
+        if (event.stage === "error") break;
+      }
+    } catch {}
+    setUpdating(false);
+    onRefresh();
+  };
+
+  const handleRestart = async () => {
+    setRestarting(true);
+    try {
+      for await (const event of streamRestart(workspace.name)) {
+        if (event.stage === "error") break;
+      }
+    } catch {}
+    setRestarting(false);
     onRefresh();
   };
 
@@ -77,6 +102,12 @@ export function WorkspaceCard({
   }
   if (isRunning) {
     actionItems.push({
+      label: restarting ? "Restarting..." : "Restart",
+      color: "var(--yellow)",
+      onClick: handleRestart,
+      disabled: restarting,
+    });
+    actionItems.push({
       label: toggling ? "Stopping..." : "Stop",
       onClick: handleToggle,
       disabled: toggling,
@@ -87,6 +118,14 @@ export function WorkspaceCard({
       color: "var(--green)",
       onClick: handleToggle,
       disabled: toggling,
+    });
+  }
+  if (workspace.outdated) {
+    actionItems.push({
+      label: updating ? "Updating..." : "Update",
+      color: "var(--accent)",
+      onClick: handleUpdate,
+      disabled: updating,
     });
   }
   if (workspace.sessions.length > 0) {
@@ -117,6 +156,9 @@ export function WorkspaceCard({
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <span style={dim}>{workspace.templateName}</span>
         <span style={dim}>{workspace.buildAge} ago</span>
+        {workspace.outdated && (
+          <span style={{ color: "var(--yellow)", fontSize: 13, fontWeight: 500 }}>Outdated</span>
+        )}
         {workspace.sessions.length > 0 && (
           <span style={dim}>
             {workspace.sessions.length} session{workspace.sessions.length !== 1 ? "s" : ""}

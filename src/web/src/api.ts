@@ -113,6 +113,68 @@ export async function stopWorkspace(workspace: string): Promise<{ ok: boolean; e
   return res.json() as Promise<{ ok: boolean; error?: string }>;
 }
 
+export async function* streamUpdate(workspace: string): AsyncGenerator<UpEvent> {
+  const res = await fetch(`${BASE}/api/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace }),
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error("Failed to start workspace update");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop()!;
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        yield JSON.parse(line.slice(6));
+      }
+    }
+  }
+}
+
+export async function* streamRestart(workspace: string): AsyncGenerator<UpEvent> {
+  const res = await fetch(`${BASE}/api/restart`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace }),
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error("Failed to start workspace restart");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop()!;
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        yield JSON.parse(line.slice(6));
+      }
+    }
+  }
+}
+
 export async function tearDown(layout: string, stop: boolean): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch(`${BASE}/api/down`, {
     method: "POST",

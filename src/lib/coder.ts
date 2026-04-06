@@ -275,6 +275,28 @@ export async function streamLogs(
   return proc.exited;
 }
 
+/** Update an outdated workspace to the latest template version. Streams build logs. */
+export async function updateWorkspace(name: string): Promise<void> {
+  const proc = Bun.spawn(["coder", "update", name, "-y"], {
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`coder update exited with code ${code}`);
+}
+
+/** Restart a running Coder workspace. Streams build logs. */
+export async function restartWorkspace(name: string): Promise<void> {
+  const proc = Bun.spawn(["coder", "restart", name, "-y"], {
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`coder restart exited with code ${code}`);
+}
+
 /** SSH into a workspace (replaces the current process). */
 export async function sshIntoWorkspace(workspaceName: string, session?: string): Promise<void> {
   const host = session ? `${workspaceName}.${session}` : workspaceName;

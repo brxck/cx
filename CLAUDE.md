@@ -16,7 +16,7 @@ Read these before making changes.
 - **Prompts**: @clack/prompts
 - **Logging**: consola
 - **Colors**: picocolors
-- **State**: bun:sqlite at `~/.config/cx/state.db`
+- **State**: bun:sqlite at `~/.cx/state.db`
 - **Build**: `bun build --compile` for standalone binaries
 
 ## Project layout

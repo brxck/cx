@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 
-const CONFIG_DIR = join(homedir(), ".config", "cx");
-const DB_PATH = join(CONFIG_DIR, "state.db");
+const DATA_DIR = join(homedir(), ".cx");
+const DB_PATH = join(DATA_DIR, "state.db");
 
 let _db: Database | null = null;
 let _dbPath: string | null = null;
@@ -55,7 +55,7 @@ export function getDb(): Database {
   if (_db) return _db;
   const dbPath = _dbPath ?? DB_PATH;
   if (dbPath !== ":memory:") {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+    mkdirSync(DATA_DIR, { recursive: true });
   }
   _db = new Database(dbPath);
   _db.exec("PRAGMA journal_mode = WAL");
