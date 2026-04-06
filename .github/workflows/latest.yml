@@ -1,0 +1,74 @@
+name: Latest Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: bun-darwin-arm64
+            artifact: cx-darwin-arm64
+          - os: macos-latest
+            target: bun-darwin-x64
+            artifact: cx-darwin-x64
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            artifact: cx-linux-x64
+          - os: ubuntu-24.04-arm
+            target: bun-linux-arm64
+            artifact: cx-linux-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install
+
+      - run: bun run typecheck
+
+      - run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Delete existing latest release
+        run: gh release delete latest --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create latest release
+        run: |
+          gh release create latest artifacts/* \
+            --title "Latest Build" \
+            --notes "Automated build from \`main\` branch ($(date -u '+%Y-%m-%d %H:%M UTC'))
+
+          Commit: ${{ github.sha }}" \
+            --prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
