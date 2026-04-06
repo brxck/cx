@@ -92,9 +92,6 @@ export async function pickWorkspace(opts?: {
     return a.name.localeCompare(b.name);
   });
 
-  // Single match — return directly
-  if (filtered.length === 1) return filtered[0]!;
-
   const selected = await p.select({
     message: opts?.message ?? "Select a workspace",
     options: filtered.map((ws) => ({
