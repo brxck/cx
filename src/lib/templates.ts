@@ -10,7 +10,7 @@ export interface TemplateVariable {
 }
 
 export interface TemplateConfig {
-  name: string;
+  name: string; // optional in JSON files — defaults to filename
   coder: {
     template: string;
     parameters?: Record<string, string>;
@@ -79,6 +79,11 @@ function ensureTemplatesDir(): void {
   mkdirSync(TEMPLATES_DIR, { recursive: true });
 }
 
+/** Derive a template name from a filename (e.g. "my-template.json" → "my-template"). */
+function nameFromFile(filename: string): string {
+  return filename.replace(/\.json$/, "");
+}
+
 /** List all saved templates. */
 export function listTemplates(): TemplateConfig[] {
   ensureTemplatesDir();
@@ -95,7 +100,11 @@ export async function listTemplatesAsync(): Promise<TemplateConfig[]> {
   ensureTemplatesDir();
   const files = readdirSync(TEMPLATES_DIR).filter((f) => f.endsWith(".json"));
   return Promise.all(
-    files.map((f) => Bun.file(join(TEMPLATES_DIR, f)).json() as Promise<TemplateConfig>),
+    files.map(async (f) => {
+      const t = await Bun.file(join(TEMPLATES_DIR, f)).json() as TemplateConfig;
+      if (!t.name) t.name = nameFromFile(f);
+      return t;
+    }),
   );
 }
 
@@ -103,7 +112,9 @@ export async function listTemplatesAsync(): Promise<TemplateConfig[]> {
 export async function getTemplate(name: string): Promise<TemplateConfig | null> {
   const path = join(TEMPLATES_DIR, `${name}.json`);
   if (!existsSync(path)) return null;
-  return Bun.file(path).json() as Promise<TemplateConfig>;
+  const t = await Bun.file(path).json() as TemplateConfig;
+  if (!t.name) t.name = name;
+  return t;
 }
 
 /** Save a template. */

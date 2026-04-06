@@ -11,6 +11,7 @@ import {
 import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
 import { saveLayout, updateLayout, getLayout, getSessionsForLayout, recordSession } from "../lib/store.ts";
 import { buildCmuxLayout, startPortForwarding, collectTerminalSurfaces } from "../lib/layout-builder.ts";
+import { isSplitNode, isPaneNode, type LayoutNode } from "../lib/templates.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
 export const attachCommand = defineCommand({
@@ -32,6 +33,12 @@ export const attachCommand = defineCommand({
     "no-ports": {
       type: "boolean",
       description: "Skip port forwarding",
+      default: false,
+    },
+    "run-commands": {
+      type: "boolean",
+      alias: "r",
+      description: "Run template commands after attaching ZMX sessions (also enables variable prompts)",
       default: false,
     },
     vars: {
@@ -143,9 +150,16 @@ export const attachCommand = defineCommand({
       }
     }
 
-    // Resolve template variables before anything consumes commands/URLs
-    const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
-    await resolveVariables(template, cliVars);
+    const runCommands = args["run-commands"] as boolean;
+
+    if (runCommands) {
+      // Resolve template variables before anything consumes commands/URLs
+      const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
+      await resolveVariables(template, cliVars);
+    } else {
+      // Strip commands so attach only creates/attaches ZMX sessions
+      stripCommands(template.layout);
+    }
 
     // If re-attaching a headless layout, inject stored session names
     if (isHeadlessReattach) {
@@ -191,3 +205,18 @@ export const attachCommand = defineCommand({
     );
   },
 });
+
+/** Remove command and cwd from all terminal surfaces in a layout tree. Mutates in place. */
+function stripCommands(node: LayoutNode): void {
+  if (isPaneNode(node)) {
+    for (const surface of node.pane.surfaces) {
+      if (surface.type === "terminal") {
+        delete surface.command;
+        delete surface.cwd;
+      }
+    }
+  } else if (isSplitNode(node)) {
+    stripCommands(node.children[0]);
+    stripCommands(node.children[1]);
+  }
+}
