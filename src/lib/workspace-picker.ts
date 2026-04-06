@@ -92,12 +92,13 @@ export async function pickWorkspace(opts?: {
     return a.name.localeCompare(b.name);
   });
 
-  const selected = await p.select({
+  const selected = await p.autocomplete({
     message: opts?.message ?? "Select a workspace",
     options: filtered.map((ws) => ({
       value: ws.name,
       label: formatWorkspaceLabel(ws),
     })),
+    placeholder: "Type to filter",
   });
 
   if (p.isCancel(selected)) return null;
@@ -137,12 +138,13 @@ export async function pickLayout(opts?: {
     return 0; // preserve store ordering (by active_at DESC)
   });
 
-  const choice = await p.select({
+  const choice = await p.autocomplete({
     message: opts?.message ?? "Select a layout",
     options: sorted.map((l) => ({
       value: l.name,
       label: formatLayoutLabel(l, cmuxRefs),
     })),
+    placeholder: "Type to filter",
   });
 
   if (p.isCancel(choice)) return null;

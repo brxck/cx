@@ -174,12 +174,16 @@ export async function resolveTemplate(opts?: {
   const pc = (await import("picocolors")).default;
   const p = await import("@clack/prompts");
 
-  const choice = await p.select({
+  // Sort alphabetically by name
+  entries.sort((a, b) => a.template.name.localeCompare(b.template.name));
+
+  const choice = await p.autocomplete({
     message: "Select a template",
     options: entries.map((e) => ({
       value: e,
       label: `${pc.bold(e.template.name)}  ${pc.dim(e.template.coder.template)}  ${pc.dim(e.template.type)}${e.isProject ? `  ${pc.dim("(project)")}` : ""}`,
     })),
+    placeholder: "Type to filter",
   });
 
   if (p.isCancel(choice)) {

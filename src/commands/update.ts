@@ -32,9 +32,10 @@ export const updateCommand = defineCommand({
         consola.info("All workspaces are up to date");
         return;
       }
-      const choice = await p.select({
+      const choice = await p.autocomplete({
         message: "Select workspace to update",
         options: outdated.map((ws) => ({ value: ws.name, label: ws.name })),
+        placeholder: "Type to filter",
       });
       if (p.isCancel(choice)) return;
       wsName = choice;

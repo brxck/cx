@@ -86,12 +86,13 @@ export const listCommand = defineCommand({
     }
 
     // Interactive: select a workspace, then pick an action
-    const selected = await p.select({
+    const selected = await p.autocomplete({
       message: "Select a workspace",
       options: filtered.map((ws) => ({
         value: ws.name,
         label: formatWorkspaceLabel(ws),
       })),
+      placeholder: "Type to filter",
     });
 
     if (p.isCancel(selected)) {

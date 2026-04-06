@@ -35,9 +35,10 @@ export const restartCommand = defineCommand({
         consola.warn("No running workspaces to restart");
         return;
       }
-      const choice = await p.select({
+      const choice = await p.autocomplete({
         message: "Select workspace to restart",
         options: running.map((ws) => ({ value: ws.name, label: ws.name })),
+        placeholder: "Type to filter",
       });
       if (p.isCancel(choice)) return;
       wsName = choice;

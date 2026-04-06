@@ -109,11 +109,18 @@ export const attachCommand = defineCommand({
         { template: defaultTemplate, source: "default" as const },
       ];
 
+      // Sort non-default entries alphabetically by name
+      entries.sort((a, b) => {
+        if (a.source === "default") return 1;
+        if (b.source === "default") return -1;
+        return a.template.name.localeCompare(b.template.name);
+      });
+
       if (entries.length === 1) {
         // Only the default — use it directly
         template = defaultTemplate;
       } else {
-        const choice = await p.select({
+        const choice = await p.autocomplete({
           message: "Select a template",
           options: entries.map((e) => ({
             value: e,
@@ -122,6 +129,7 @@ export const attachCommand = defineCommand({
                 ? `${pc.bold("default")}  ${pc.dim("single pane")}`
                 : `${pc.bold(e.template.name)}  ${pc.dim(e.template.coder.template)}  ${pc.dim(e.template.type)}${e.source === "project" ? `  ${pc.dim("(project)")}` : ""}`,
           })),
+          placeholder: "Type to filter",
         });
 
         if (p.isCancel(choice)) {
