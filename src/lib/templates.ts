@@ -1,7 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, readdirSync, unlinkSync, existsSync } from "node:fs";
-import { sshHost, sshHostWithSession } from "./ssh.ts";
 
 // ── Types ──
 
@@ -21,8 +20,6 @@ export interface TemplateConfig {
   color?: string;
   ports?: string[];
   variables?: Record<string, TemplateVariable>;
-  /** Use cmux ssh for managed connections and browser proxying. Default: true. */
-  ssh?: boolean;
   layout: LayoutNode;
 }
 
@@ -188,134 +185,3 @@ export function deleteTemplate(name: string): boolean {
   return true;
 }
 
-// ── cmux.json generation ──
-
-/** Marker field to identify cx-generated commands. */
-const GENERATED_MARKER = "cx";
-
-interface CmuxCommand {
-  name: string;
-  keywords?: string[];
-  color?: string;
-  restart?: string;
-  layout: CmuxLayoutNode;
-  /** Internal marker — not part of cmux spec but used to track our entries. */
-  _generator?: string;
-}
-
-type CmuxLayoutNode = CmuxSplitNode | CmuxPaneNode;
-
-interface CmuxSplitNode {
-  direction: "horizontal" | "vertical";
-  split?: number;
-  children: [CmuxLayoutNode, CmuxLayoutNode];
-}
-
-interface CmuxPaneNode {
-  pane: {
-    surfaces: CmuxSurfaceEntry[];
-  };
-}
-
-interface CmuxSurfaceEntry {
-  type: "terminal" | "browser";
-  name?: string;
-  command?: string;
-  url?: string;
-}
-
-/**
- * Generate a cmux.json command entry from a template.
- * Terminal commands get wrapped with SSH into the Coder workspace.
- * Returns null for SSH-mode layouts (custom commands don't support SSH workspaces).
- */
-export async function generateCmuxCommand(
-  template: TemplateConfig,
-  coderWorkspace: string,
-): Promise<CmuxCommand | null> {
-  if (template.ssh !== false) return null;
-  return {
-    name: `${template.name} (${coderWorkspace})`,
-    keywords: ["coder", template.name, coderWorkspace],
-    color: template.color,
-    restart: "ignore",
-    layout: await transformLayoutForSsh(template.layout, coderWorkspace),
-    _generator: GENERATED_MARKER,
-  };
-}
-
-/** Recursively transform layout, wrapping terminal commands with SSH. */
-async function transformLayoutForSsh(node: LayoutNode, coderWorkspace: string): Promise<CmuxLayoutNode> {
-  if (isSplitNode(node)) {
-    return {
-      direction: node.direction,
-      split: node.split,
-      children: [
-        await transformLayoutForSsh(node.children[0], coderWorkspace),
-        await transformLayoutForSsh(node.children[1], coderWorkspace),
-      ],
-    };
-  }
-
-  return {
-    pane: {
-      surfaces: await Promise.all(node.pane.surfaces.map(async (s) => {
-        if (s.type === "terminal") {
-          const host = s.session
-            ? await sshHostWithSession(coderWorkspace, s.session)
-            : await sshHost(coderWorkspace);
-          const remoteCmd = s.command ? ` -t '${s.command}'` : "";
-          return {
-            type: "terminal" as const,
-            name: s.name,
-            command: `ssh -R /tmp/cmux.sock:$CMUX_SOCKET_PATH ${host}${remoteCmd}`,
-          };
-        }
-        return {
-          type: s.type,
-          name: s.name,
-          url: s.url,
-        };
-      })),
-    },
-  };
-}
-
-const CMUX_JSON_PATH = join(homedir(), ".config", "cmux", "cmux.json");
-
-/**
- * Write commands to ~/.config/cmux/cmux.json, merging with existing
- * non-cx entries.
- */
-export async function writeCmuxJson(commands: CmuxCommand[]): Promise<void> {
-  let existing: CmuxCommand[] = [];
-  if (existsSync(CMUX_JSON_PATH)) {
-    const data = await Bun.file(CMUX_JSON_PATH).json();
-    existing = (data.commands ?? []) as CmuxCommand[];
-  }
-
-  // Keep non-cx entries, replace ours
-  const preserved = existing.filter((c) => c._generator !== GENERATED_MARKER);
-  const merged = [...preserved, ...commands];
-
-  mkdirSync(join(homedir(), ".config", "cmux"), { recursive: true });
-  await Bun.write(
-    CMUX_JSON_PATH,
-    JSON.stringify({ commands: merged }, null, 2) + "\n",
-  );
-}
-
-/** Remove a generated cmux.json entry by layout name. */
-export async function removeCmuxJsonEntry(layoutName: string): Promise<void> {
-  if (!existsSync(CMUX_JSON_PATH)) return;
-  const data = await Bun.file(CMUX_JSON_PATH).json();
-  const commands = (data.commands ?? []) as CmuxCommand[];
-  const filtered = commands.filter(
-    (c) => !(c._generator === GENERATED_MARKER && c.name.includes(`(${layoutName})`)),
-  );
-  if (filtered.length === commands.length) return;
-  await Bun.write(
-    CMUX_JSON_PATH,
-    JSON.stringify({ commands: filtered }, null, 2) + "\n",
-  );
-}

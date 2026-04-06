@@ -17,36 +17,21 @@ import { sshHost, sshHostWithSession } from "./ssh.ts";
 export interface BuiltLayout {
   cmuxRef: string;
   sessions: Array<{ name: string; command?: string }>;
-  sshMode: boolean;
 }
 
 /**
- * Create a Cmux workspace and populate it by walking the template's layout tree.
- * Dispatches to SSH or legacy path based on template config.
+ * Create a Cmux SSH workspace and populate it by walking the template's layout tree.
+ * The SSH surface is the first terminal pane with a managed connection.
+ * Browser panes auto-proxy through the relay daemon's SOCKS5 proxy.
+ * Secondary terminals are local panes with SSH commands.
  */
 export async function buildCmuxLayout(
   layoutName: string,
   template: TemplateConfig,
   coderWsName: string,
 ): Promise<BuiltLayout> {
-  if (template.ssh !== false) {
-    return buildSshLayout(layoutName, template, coderWsName);
-  }
-  return buildLegacyLayout(layoutName, template, coderWsName);
-}
-
-/**
- * Create a Cmux SSH workspace. The SSH surface is the first terminal pane.
- * Browser panes auto-proxy through the relay daemon's SOCKS5 proxy.
- * Secondary terminals are local panes with SSH commands.
- */
-async function buildSshLayout(
-  layoutName: string,
-  template: TemplateConfig,
-  coderWsName: string,
-): Promise<BuiltLayout> {
   const spinner = p.spinner();
-  spinner.start("Building SSH layout");
+  spinner.start("Building layout");
 
   const existingSessions = getSessions(coderWsName);
   assignSessionNames(template.layout, existingSessions);
@@ -59,35 +44,10 @@ async function buildSshLayout(
   }
 
   const sessions: Array<{ name: string; command?: string }> = [];
-  await walkSshLayout(template.layout, wsRef, coderWsName, true, sessions);
+  await walkLayout(template.layout, wsRef, coderWsName, true, sessions);
 
-  spinner.stop(`SSH layout built — ${pc.cyan(wsRef)}`);
-  return { cmuxRef: wsRef, sessions, sshMode: true };
-}
-
-/** Legacy: create workspace with cmux new-workspace and send SSH commands. */
-async function buildLegacyLayout(
-  layoutName: string,
-  template: TemplateConfig,
-  coderWsName: string,
-): Promise<BuiltLayout> {
-  const spinner = p.spinner();
-  spinner.start("Building Cmux layout");
-
-  const existingSessions = getSessions(coderWsName);
-  assignSessionNames(template.layout, existingSessions);
-
-  const wsRef = await cmux.newWorkspace({ name: layoutName });
-
-  if (template.color) {
-    await cmux.setWorkspaceColor(wsRef, template.color);
-  }
-
-  const sessions: Array<{ name: string; command?: string }> = [];
-  await walkLegacyLayout(template.layout, wsRef, coderWsName, true, sessions);
-
-  spinner.stop(`Cmux layout built — ${pc.cyan(wsRef)}`);
-  return { cmuxRef: wsRef, sessions, sshMode: false };
+  spinner.stop(`Layout built — ${pc.cyan(wsRef)}`);
+  return { cmuxRef: wsRef, sessions };
 }
 
 /**
@@ -168,9 +128,9 @@ export function startPortForwarding(coderWsName: string, ports: string[]): void 
   consola.info(`Port forwarding started: ${pc.dim(summary)} (pid ${proc.pid})`);
 }
 
-// ── SSH layout helpers ──
+// ── Internal helpers ──
 
-async function walkSshLayout(
+async function walkLayout(
   node: LayoutNode,
   wsRef: string,
   coderWs: string,
@@ -178,21 +138,21 @@ async function walkSshLayout(
   sessions: Array<{ name: string; command?: string }>,
 ): Promise<void> {
   if (isPaneNode(node)) {
-    await configureSshSurfaces(node, wsRef, coderWs, isFirst, sessions);
+    await configureSurfaces(node, wsRef, coderWs, isFirst, sessions);
     return;
   }
 
   if (isSplitNode(node)) {
-    await walkSshLayout(node.children[0], wsRef, coderWs, isFirst, sessions);
+    await walkLayout(node.children[0], wsRef, coderWs, isFirst, sessions);
 
     const direction = node.direction === "horizontal" ? "right" : "down";
     await cmux.newPane({ workspace: wsRef, direction });
 
-    await walkSshLayout(node.children[1], wsRef, coderWs, true, sessions);
+    await walkLayout(node.children[1], wsRef, coderWs, true, sessions);
   }
 }
 
-async function configureSshSurfaces(
+async function configureSurfaces(
   node: PaneNode,
   wsRef: string,
   coderWs: string,
@@ -238,82 +198,10 @@ async function configureSshSurfaces(
   }
 }
 
-/** Build SSH command for secondary panes (no socket forwarding — relay daemon handles it). */
 async function buildSshCommand(coderWs: string, opts?: { session?: string; command?: string }): Promise<string> {
   const host = opts?.session
     ? await sshHostWithSession(coderWs, opts.session)
     : await sshHost(coderWs);
   const remoteCmd = opts?.command ? ` -t '${opts.command}'` : "";
   return `ssh ${host}${remoteCmd}`;
-}
-
-// ── Legacy layout helpers ──
-
-async function walkLegacyLayout(
-  node: LayoutNode,
-  wsRef: string,
-  coderWs: string,
-  isFirst: boolean,
-  sessions: Array<{ name: string; command?: string }>,
-): Promise<void> {
-  if (isPaneNode(node)) {
-    await configureLegacySurfaces(node, wsRef, coderWs, isFirst, sessions);
-    return;
-  }
-
-  if (isSplitNode(node)) {
-    await walkLegacyLayout(node.children[0], wsRef, coderWs, isFirst, sessions);
-
-    const direction = node.direction === "horizontal" ? "right" : "down";
-    await cmux.newPane({ workspace: wsRef, direction });
-
-    await walkLegacyLayout(node.children[1], wsRef, coderWs, true, sessions);
-  }
-}
-
-async function configureLegacySurfaces(
-  node: PaneNode,
-  wsRef: string,
-  coderWs: string,
-  isFirst: boolean,
-  sessions: Array<{ name: string; command?: string }>,
-): Promise<void> {
-  const surfaces = node.pane.surfaces;
-
-  for (let i = 0; i < surfaces.length; i++) {
-    const surface = surfaces[i]!;
-    const isFirstSurface = i === 0 && isFirst;
-
-    if (surface.type === "browser") {
-      await cmux.newSurface({
-        workspace: wsRef,
-        type: "browser",
-        url: surface.url,
-      });
-    } else {
-      const sshCmd = await buildLegacySshCommand(coderWs, { session: surface.session, command: surface.command });
-      if (isFirstSurface) {
-        await cmux.send(`${sshCmd}\n`, { workspace: wsRef });
-      } else {
-        const surfRef = await cmux.newSurface({
-          workspace: wsRef,
-          type: "terminal",
-        });
-        await cmux.send(`${sshCmd}\n`, {
-          workspace: wsRef,
-          surface: surfRef,
-        });
-      }
-      sessions.push({ name: surface.session!, command: surface.command });
-    }
-  }
-}
-
-/** Legacy SSH command with socket forwarding. */
-async function buildLegacySshCommand(coderWs: string, opts?: { session?: string; command?: string }): Promise<string> {
-  const host = opts?.session
-    ? await sshHostWithSession(coderWs, opts.session)
-    : await sshHost(coderWs);
-  const remoteCmd = opts?.command ? ` -t '${opts.command}'` : "";
-  return `ssh -R /tmp/cmux.sock:$CMUX_SOCKET_PATH ${host}${remoteCmd}`;
 }

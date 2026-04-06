@@ -29,7 +29,6 @@ interface LayoutStatus {
   type: string;
   template: string | null;
   path: string | null;
-  sshMode: boolean;
   createdAt: string;
   lastActiveAt: string;
   coderWorkspace: string;
@@ -98,7 +97,6 @@ function buildLayoutStatuses(
       type: layout.type,
       template: layout.template,
       path: layout.path,
-      sshMode: !!layout.ssh_mode,
       createdAt: layout.created_at,
       lastActiveAt: layout.active_at,
       coderWorkspace: layout.coder_ws,
@@ -176,7 +174,6 @@ function renderLayoutBox(layout: LayoutStatus): void {
     lines.push(field("Cmux", pc.yellow("⊘") + "  headless"));
   } else if (layout.cmuxActive) {
     const cmuxParts = [pc.green("●"), "active", pc.dim(layout.cmuxRef)];
-    if (layout.sshMode) cmuxParts.push(pc.blue("[ssh]"));
     if (layout.cmuxSelected) cmuxParts.push(pc.cyan("[selected]"));
     lines.push(field("Cmux", cmuxParts.join("  ")));
   } else {

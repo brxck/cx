@@ -4,8 +4,6 @@ import pc from "picocolors";
 import { ensureSshConfig, workspaceStatus } from "../lib/coder.ts";
 import {
   resolveTemplate,
-  generateCmuxCommand,
-  writeCmuxJson,
   type TemplateConfig,
   listTemplatesAsync,
   getProjectTemplates,
@@ -156,7 +154,7 @@ export const attachCommand = defineCommand({
     sshSpinner.stop("SSH config updated");
 
     // 4. Build Cmux layout
-    const { cmuxRef, sessions, sshMode } = await buildCmuxLayout(layoutName, template, workspace.name);
+    const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, workspace.name);
 
     // 5. Port forwarding
     const noPorts = args["no-ports"] as boolean;
@@ -172,16 +170,11 @@ export const attachCommand = defineCommand({
       template: template.name,
       type: template.type,
       path: projectPath,
-      ssh_mode: sshMode,
     });
 
     for (const session of sessions) {
       recordSession(workspace.name, session.name, layoutName);
     }
-
-    // 7. Generate cmux.json
-    const cmd = await generateCmuxCommand(template, workspace.name);
-    if (cmd) await writeCmuxJson([cmd]);
 
     p.outro(
       `${pc.green("✓")} Layout ${pc.bold(layoutName)} attached — workspace ${pc.cyan(cmuxRef)}`,

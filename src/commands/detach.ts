@@ -2,7 +2,6 @@ import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import * as cmux from "../lib/cmux.ts";
-import { removeCmuxJsonEntry } from "../lib/templates.ts";
 import { getLayout, getLayoutsByPath, getAllLayouts, removeLayout, type LayoutEntry } from "../lib/store.ts";
 import { pickLayout } from "../lib/workspace-picker.ts";
 
@@ -35,11 +34,6 @@ export const detachCommand = defineCommand({
 
     // 3. Remove from store
     removeLayout(layout.name);
-
-    // 4. Clean up cmux.json (SSH layouts don't generate entries)
-    if (!layout.ssh_mode) {
-      await removeCmuxJsonEntry(layout.name);
-    }
 
     p.outro(
       `${pc.green("✓")} Layout ${pc.bold(layout.name)} detached — workspace ${pc.cyan(layout.coder_ws)} is still running`,

@@ -85,7 +85,6 @@ export interface LayoutEntry {
   type: LayoutType;
   branch: string | null;
   path: string | null;
-  ssh_mode: number;
   created_at: string;
   active_at: string;
 }
@@ -126,14 +125,13 @@ export function saveLayout(entry: {
   type?: LayoutType;
   branch?: string | null;
   path?: string | null;
-  ssh_mode?: boolean;
 }): void {
   getDb()
     .query(
-      `INSERT INTO layouts (name, cmux_id, coder_ws, template, type, branch, path, ssh_mode)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+      `INSERT INTO layouts (name, cmux_id, coder_ws, template, type, branch, path)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
        ON CONFLICT(name) DO UPDATE SET
-         cmux_id = ?2, coder_ws = ?3, template = ?4, type = ?5, branch = ?6, path = ?7, ssh_mode = ?8,
+         cmux_id = ?2, coder_ws = ?3, template = ?4, type = ?5, branch = ?6, path = ?7,
          active_at = datetime('now')`
     )
     .run(
@@ -144,7 +142,6 @@ export function saveLayout(entry: {
       entry.type ?? "persistent",
       entry.branch ?? null,
       entry.path ?? null,
-      entry.ssh_mode ? 1 : 0,
     );
 }
 

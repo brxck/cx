@@ -3,7 +3,6 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { stopWorkspace } from "../lib/coder.ts";
 import * as cmux from "../lib/cmux.ts";
-import { removeCmuxJsonEntry } from "../lib/templates.ts";
 import { getAllLayouts, getLayout, getLayoutsByPath, removeLayout, type LayoutEntry } from "../lib/store.ts";
 import { pickLayout } from "../lib/workspace-picker.ts";
 
@@ -60,11 +59,6 @@ export const downCommand = defineCommand({
 
     // 5. Remove from store
     removeLayout(layout.name);
-
-    // 6. Clean up cmux.json (SSH layouts don't generate entries)
-    if (!layout.ssh_mode) {
-      await removeCmuxJsonEntry(layout.name);
-    }
 
     p.outro(`${pc.green("✓")} Layout ${pc.bold(layout.name)} torn down`);
   },

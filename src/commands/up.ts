@@ -13,8 +13,6 @@ import {
 } from "../lib/coder.ts";
 import {
   resolveTemplate as resolveTemplateFromLib,
-  generateCmuxCommand,
-  writeCmuxJson,
   type TemplateConfig,
 } from "../lib/templates.ts";
 import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
@@ -102,10 +100,6 @@ export const upCommand = defineCommand({
       startPortForwarding(coderWsName, template.ports);
     }
 
-    // 5. Generate cmux.json (for later attachment or custom commands)
-    const cmd = await generateCmuxCommand(template, coderWsName);
-    if (cmd) await writeCmuxJson([cmd]);
-
     if (args.headless) {
       // Headless: start ZMX sessions without a Cmux layout
       const sessions = await startHeadlessSessions(template, coderWsName);
@@ -127,10 +121,10 @@ export const upCommand = defineCommand({
       return;
     }
 
-    // 6. Build Cmux layout
-    const { cmuxRef, sessions, sshMode } = await buildCmuxLayout(layoutName, template, coderWsName);
+    // 5. Build Cmux layout
+    const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, coderWsName);
 
-    // 7. Save to store (must happen before recordSession due to FK constraint)
+    // 6. Save to store (must happen before recordSession due to FK constraint)
     saveLayout({
       name: layoutName,
       cmux_id: cmuxRef,
@@ -138,7 +132,6 @@ export const upCommand = defineCommand({
       template: template.name,
       type: template.type,
       path: projectPath,
-      ssh_mode: sshMode,
     });
 
     for (const session of sessions) {
