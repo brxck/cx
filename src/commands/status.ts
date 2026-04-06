@@ -1,123 +1,8 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
-import {
-  type CoderWorkspace,
-  listWorkspaces as listCoderWorkspaces,
-  workspaceStatus,
-  relativeTime,
-} from "../lib/coder.ts";
-import {
-  type CmuxWorkspace,
-  type SidebarState,
-  listWorkspaces as listCmuxWorkspaces,
-  ping as cmuxPing,
-  sidebarState,
-  parseSidebarState,
-} from "../lib/cmux.ts";
-import {
-  type LayoutEntry,
-  getAllLayouts,
-  getSessionsForLayout,
-  updateLayout,
-} from "../lib/store.ts";
-import { detectPortForwardMap } from "../lib/ports.ts";
-
-// ── Types ──
-
-interface LayoutStatus {
-  name: string;
-  type: string;
-  template: string | null;
-  path: string | null;
-  createdAt: string;
-  lastActiveAt: string;
-  coderWorkspace: string;
-  coderStatus: string;
-  coderHealthy: boolean;
-  coderOutdated: boolean;
-  coderBuildAge: string;
-  coderTemplateName: string | null;
-  cmuxRef: string;
-  cmuxActive: boolean;
-  cmuxSelected: boolean;
-  gitBranch: string | null;
-  gitDirty: boolean;
-  pr: string | null;
-  claudeStatus: string | null;
-  portForwards: string[];
-  sessions: string[];
-}
-
-// ── Helpers ──
-
-async function fetchSidebarStates(
-  layouts: LayoutEntry[],
-  cmuxWorkspaces: CmuxWorkspace[],
-): Promise<Map<string, SidebarState>> {
-  const cmuxRefs = new Set(cmuxWorkspaces.map((w) => w.ref));
-  const entries = layouts.filter((l) => cmuxRefs.has(l.cmux_id));
-
-  const results = await Promise.all(
-    entries.map(async (layout) => {
-      try {
-        const output = await sidebarState(layout.cmux_id);
-        return [layout.name, parseSidebarState(output)] as const;
-      } catch {
-        return null;
-      }
-    }),
-  );
-
-  const map = new Map<string, SidebarState>();
-  for (const entry of results) {
-    if (entry) map.set(entry[0], entry[1]);
-  }
-  return map;
-}
-
-function buildLayoutStatuses(
-  layouts: LayoutEntry[],
-  coderWorkspaces: CoderWorkspace[],
-  cmuxWorkspaces: CmuxWorkspace[],
-  sidebarStates: Map<string, SidebarState>,
-  portForwards: Map<string, string[]>,
-): LayoutStatus[] {
-  const coderByName = new Map(coderWorkspaces.map((w) => [w.name, w]));
-  const cmuxByRef = new Map(cmuxWorkspaces.map((w) => [w.ref, w]));
-
-  return layouts.map((layout) => {
-    const coder = coderByName.get(layout.coder_ws);
-    const cmux = cmuxByRef.get(layout.cmux_id);
-    const sidebar = sidebarStates.get(layout.name);
-    const sessions = getSessionsForLayout(layout.name);
-    const ports = portForwards.get(layout.coder_ws) ?? [];
-
-    return {
-      name: layout.name,
-      type: layout.type,
-      template: layout.template,
-      path: layout.path,
-      createdAt: layout.created_at,
-      lastActiveAt: layout.active_at,
-      coderWorkspace: layout.coder_ws,
-      coderStatus: coder ? workspaceStatus(coder) : "unknown",
-      coderHealthy: coder?.health.healthy ?? false,
-      coderOutdated: coder?.outdated ?? false,
-      coderBuildAge: coder ? relativeTime(coder.latest_build.created_at) : "?",
-      coderTemplateName: coder?.template_name ?? null,
-      cmuxRef: layout.cmux_id,
-      cmuxActive: !!cmux,
-      cmuxSelected: cmux?.selected ?? false,
-      gitBranch: sidebar?.gitBranch ?? layout.branch,
-      gitDirty: sidebar?.gitDirty ?? false,
-      pr: sidebar?.pr ?? null,
-      claudeStatus: sidebar?.claudeStatus ?? null,
-      portForwards: ports,
-      sessions,
-    };
-  });
-}
+import { workspaceStatus, relativeTime, type CoderWorkspace } from "../lib/coder.ts";
+import { type LayoutStatus, gatherStatus } from "../lib/status.ts";
 
 // ── Rendering ──
 
@@ -272,47 +157,13 @@ export const statusCommand = defineCommand({
     layout: { type: "string", description: "Show a specific layout" },
   },
   async run({ args }) {
-    // 1. Gather data in parallel
-    const cmuxAlive = await cmuxPing();
+    const result = await gatherStatus();
 
-    const [layouts, coderWorkspaces, cmuxWorkspaces, portForwards] =
-      await Promise.all([
-        Promise.resolve(getAllLayouts()),
-        listCoderWorkspaces().catch((): CoderWorkspace[] => {
-          if (!args.json) consola.warn("Could not reach Coder CLI");
-          return [];
-        }),
-        cmuxAlive
-          ? listCmuxWorkspaces().catch((): CmuxWorkspace[] => [])
-          : Promise.resolve([] as CmuxWorkspace[]),
-        detectPortForwardMap(),
-      ]);
-
-    if (!cmuxAlive && !args.json) {
+    if (!result.cmuxAlive && !args.json) {
       consola.warn("Cmux is not running — sidebar data unavailable");
     }
 
-    // 2. Fetch sidebar states for active layouts
-    const sidebarStates = cmuxAlive
-      ? await fetchSidebarStates(layouts, cmuxWorkspaces)
-      : new Map<string, SidebarState>();
-
-    // Opportunistically persist branch data from live sidebar
-    for (const layout of layouts) {
-      const sidebar = sidebarStates.get(layout.name);
-      if (sidebar?.gitBranch && sidebar.gitBranch !== layout.branch) {
-        try { updateLayout(layout.name, { branch: sidebar.gitBranch }); } catch {}
-      }
-    }
-
-    // 3. Build unified statuses
-    let layoutStatuses = buildLayoutStatuses(
-      layouts,
-      coderWorkspaces,
-      cmuxWorkspaces,
-      sidebarStates,
-      portForwards,
-    );
+    let layoutStatuses = result.layouts;
 
     // Filter to specific layout if requested
     if (args.layout) {
@@ -323,17 +174,11 @@ export const statusCommand = defineCommand({
       }
     }
 
-    // 4. Find untracked Coder workspaces
-    const trackedCoderNames = new Set(layouts.map((l) => l.coder_ws));
-    const untrackedCoder = coderWorkspaces.filter(
-      (ws) => !trackedCoderNames.has(ws.name),
-    );
-
-    // 5. Render
+    // Render
     if (args.json) {
       console.log(
         JSON.stringify(
-          { layouts: layoutStatuses, untracked: untrackedCoder },
+          { layouts: layoutStatuses, untracked: result.untracked },
           null,
           2,
         ),
@@ -341,7 +186,7 @@ export const statusCommand = defineCommand({
       return;
     }
 
-    if (layoutStatuses.length === 0 && untrackedCoder.length === 0) {
+    if (layoutStatuses.length === 0 && result.untracked.length === 0) {
       consola.info("No tracked layouts or Coder workspaces found");
       return;
     }
@@ -356,20 +201,12 @@ export const statusCommand = defineCommand({
     }
 
     if (!args.layout) {
-      renderUntracked(untrackedCoder);
-
-      const coderRunning = coderWorkspaces.filter(
-        (w) => workspaceStatus(w) === "running",
-      ).length;
-      const pfCount = [...portForwards.values()].reduce(
-        (sum, p) => sum + p.length,
-        0,
-      );
+      renderUntracked(result.untracked);
       renderSummary(
         layoutStatuses,
-        coderWorkspaces.length,
-        coderRunning,
-        pfCount,
+        result.coderTotal,
+        result.coderRunning,
+        result.portForwardCount,
       );
     }
   },

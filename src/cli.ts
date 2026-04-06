@@ -19,6 +19,7 @@ import { logsCommand } from "./commands/logs.ts";
 import { initCommand } from "./commands/init.ts";
 import { forwardCommand } from "./commands/forward.ts";
 import { unforwardCommand } from "./commands/unforward.ts";
+import { serveCommand } from "./commands/serve.ts";
 
 const commandGroups = [
   {
@@ -36,6 +37,10 @@ const commandGroups = [
   {
     label: "Configuration",
     commands: ["init"],
+  },
+  {
+    label: "Server",
+    commands: ["serve"],
   },
 ];
 
@@ -63,6 +68,7 @@ const main = defineCommand({
     forward: forwardCommand,
     unforward: unforwardCommand,
     init: initCommand,
+    serve: serveCommand,
   },
 });
 
