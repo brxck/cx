@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "build": "bun run build:web && bun build src/cli.ts --compile --outfile dist/cx",
+    "build": "bun run build:web && bun run scripts/embed-web.ts && bun build src/cli.ts --compile --outfile dist/cx",
     "dev:web": "cd src/web && bun run dev & bun run src/cli.ts serve && wait",
     "build:web": "cd src/web && bun run build",
     "test": "bun test",

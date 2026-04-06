@@ -1,7 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
-import { join, extname } from "node:path";
 import { handleStatus } from "../api/status.ts";
 import { handleTemplates } from "../api/templates.ts";
 import { handleUp } from "../api/up.ts";
@@ -11,18 +10,7 @@ import { handleApps } from "../api/apps.ts";
 import { handleStart } from "../api/start.ts";
 import { handleUpdate } from "../api/update.ts";
 import { handleRestart } from "../api/restart.ts";
-
-const MIME_TYPES: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "application/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-};
+import { WEB_ASSETS } from "../web/embedded.ts";
 
 export const serveCommand = defineCommand({
   meta: {
@@ -39,7 +27,6 @@ export const serveCommand = defineCommand({
   },
   async run({ args }) {
     const port = parseInt(args.port as string, 10);
-    const distDir = join(import.meta.dir, "..", "web", "dist");
 
     const server = Bun.serve({
       port,
@@ -129,23 +116,21 @@ export const serveCommand = defineCommand({
           return response;
         }
 
-        // Static file serving
+        // Static file serving from embedded assets
         const filePath = pathname === "/" ? "/index.html" : pathname;
-        const file = Bun.file(join(distDir, filePath));
+        const asset = WEB_ASSETS[filePath];
 
-        if (await file.exists()) {
-          const ext = extname(filePath);
-          const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
-          return new Response(file, {
-            headers: { "Content-Type": contentType },
+        if (asset) {
+          return new Response(asset.content, {
+            headers: { "Content-Type": asset.contentType, ...corsHeaders },
           });
         }
 
         // SPA fallback — serve index.html for client-side routing
-        const indexFile = Bun.file(join(distDir, "index.html"));
-        if (await indexFile.exists()) {
-          return new Response(indexFile, {
-            headers: { "Content-Type": "text/html" },
+        const index = WEB_ASSETS["/index.html"];
+        if (index) {
+          return new Response(index.content, {
+            headers: { "Content-Type": "text/html", ...corsHeaders },
           });
         }
 
