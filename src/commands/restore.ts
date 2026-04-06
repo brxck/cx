@@ -12,6 +12,7 @@ import {
 } from "../lib/coder.ts";
 import {
   getTemplate,
+  normalizeCommand,
   type TemplateConfig,
 } from "../lib/templates.ts";
 import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
@@ -178,7 +179,7 @@ async function restoreLayout(layout: LayoutEntry, cliVars: Record<string, string
     if (sessionName) {
       terminals[i]!.session = sessionName;
       if (!liveSessionNames.has(sessionName)) {
-        sessionsToRestart.push({ name: sessionName, command: terminals[i]!.command });
+        sessionsToRestart.push({ name: sessionName, command: normalizeCommand(terminals[i]!.command) });
       }
     }
   }

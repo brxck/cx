@@ -4,6 +4,7 @@ import * as cmux from "./cmux.ts";
 import {
   isSplitNode,
   isPaneNode,
+  normalizeCommand,
   type TemplateConfig,
   type LayoutNode,
   type PaneNode,
@@ -68,10 +69,10 @@ export async function startHeadlessSessions(
 
   for (const surface of surfaces) {
     const sessionName = surface.session!;
-    const command = surface.command ?? "";
+    const command = normalizeCommand(surface.command) ?? "";
     const host = await sshHost(coderWsName);
     await Bun.$`ssh ${host} -- zmx run ${sessionName} ${command}`.quiet();
-    sessions.push({ name: sessionName, command: surface.command });
+    sessions.push({ name: sessionName, command });
   }
 
   spinner.stop(`${sessions.length} ZMX sessions started`);
@@ -174,17 +175,19 @@ async function configureSurfaces(
     } else if (isFirstSurface) {
       // The SSH workspace surface is already connected to the remote.
       // Send zmx attach to start the session on it.
+      const cmd = normalizeCommand(surface.command);
       if (surface.session) {
-        const zmxCmd = surface.command
-          ? `zmx attach ${surface.session} -- ${surface.command}`
+        const zmxCmd = cmd
+          ? `zmx attach ${surface.session} -- ${cmd}`
           : `zmx attach ${surface.session}`;
         await cmux.send(`${zmxCmd}\n`, { workspace: wsRef });
       }
-      sessions.push({ name: surface.session!, command: surface.command });
+      sessions.push({ name: surface.session!, command: cmd });
     } else {
       // Secondary terminals: local panes with SSH commands.
       // No -R socket forwarding needed — the relay daemon handles it.
-      const sshCmd = await buildSshCommand(coderWs, { session: surface.session, command: surface.command });
+      const cmd = normalizeCommand(surface.command);
+      const sshCmd = await buildSshCommand(coderWs, { session: surface.session, command: cmd });
       const surfRef = await cmux.newSurface({
         workspace: wsRef,
         type: "terminal",
@@ -193,7 +196,7 @@ async function configureSurfaces(
         workspace: wsRef,
         surface: surfRef,
       });
-      sessions.push({ name: surface.session!, command: surface.command });
+      sessions.push({ name: surface.session!, command: cmd });
     }
   }
 }

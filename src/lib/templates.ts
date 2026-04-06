@@ -41,7 +41,7 @@ export interface SurfaceConfig {
   type: "terminal" | "browser";
   name?: string;
   session?: string;
-  command?: string;
+  command?: string | string[];
   url?: string;
   focus?: boolean;
 }
@@ -52,6 +52,13 @@ export function isSplitNode(node: LayoutNode): node is SplitNode {
 
 export function isPaneNode(node: LayoutNode): node is PaneNode {
   return "pane" in node;
+}
+
+/** Normalize a command field (string or string[]) into a single shell string. */
+export function normalizeCommand(cmd: string | string[] | undefined): string | undefined {
+  if (cmd == null) return undefined;
+  if (Array.isArray(cmd)) return cmd.join(" && ");
+  return cmd;
 }
 
 // ── Template management ──

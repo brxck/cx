@@ -12,10 +12,13 @@ const VAR_PATTERN = /\{\{(\w+)\}\}/g;
 export function extractVariables(template: TemplateConfig): string[] {
   const names = new Set<string>();
 
-  function scanString(str: string | undefined): void {
+  function scanString(str: string | string[] | undefined): void {
     if (!str) return;
-    for (const match of str.matchAll(VAR_PATTERN)) {
-      names.add(match[1]!);
+    const strings = Array.isArray(str) ? str : [str];
+    for (const s of strings) {
+      for (const match of s.matchAll(VAR_PATTERN)) {
+        names.add(match[1]!);
+      }
     }
   }
 
@@ -102,7 +105,11 @@ function substituteVariables(template: TemplateConfig, vars: Record<string, stri
   function walkNode(node: LayoutNode): void {
     if (isPaneNode(node)) {
       for (const surface of node.pane.surfaces) {
-        if (surface.command) surface.command = replaceVars(surface.command);
+        if (surface.command) {
+          surface.command = Array.isArray(surface.command)
+            ? surface.command.map(replaceVars)
+            : replaceVars(surface.command);
+        }
         if (surface.url) surface.url = replaceVars(surface.url);
       }
     } else if (isSplitNode(node)) {
