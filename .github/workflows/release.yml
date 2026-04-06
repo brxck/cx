@@ -36,6 +36,8 @@ jobs:
 
       - run: bun install
 
+      - run: bun run build:web && bun run scripts/embed-web.ts
+
       - run: bun run typecheck
 
       - run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
