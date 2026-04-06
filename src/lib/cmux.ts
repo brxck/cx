@@ -100,6 +100,25 @@ function parseSshResponse(output: string): CmuxSshResult {
   return { workspace: map.workspace, target: map.target, state: map.state };
 }
 
+/** Wait for a shell prompt to appear on a surface. */
+export async function waitForPrompt(
+  wsRef: string,
+  surfaceRef?: string,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const start = Date.now();
+  const args: string[] = ["--workspace", wsRef];
+  if (surfaceRef) args.push("--surface", surfaceRef);
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const screen = await $`cmux read-screen ${args}`.quiet().text();
+      const trimmed = screen.trimEnd();
+      if (trimmed.length > 0 && /[❯$%#>]\s*$/.test(trimmed)) return;
+    } catch {}
+    await Bun.sleep(100);
+  }
+}
+
 /** Wait for an SSH workspace to connect and a shell prompt to appear on a surface. */
 export async function waitForSshReady(
   wsRef: string,

@@ -172,11 +172,6 @@ async function configureSurfaces(
       });
     } else {
       const cmd = normalizeCommand(surface.command, surface.cwd);
-      const zmxCmd = surface.session
-        ? cmd
-          ? `zmx attach ${surface.session} -- ${cmd}`
-          : `zmx attach ${surface.session}`
-        : cmd;
 
       // Index 0 uses the surface from the split (or SSH workspace default).
       // Additional surfaces in the same pane need newSurface.
@@ -188,12 +183,21 @@ async function configureSurfaces(
         });
       }
 
-      if (zmxCmd) {
-        consola.debug(`send to surface=${targetSurf ?? "default"}: ${zmxCmd}`);
-        await cmux.send(`${zmxCmd}\n`, {
-          workspace: wsRef,
-          surface: targetSurf,
-        });
+      const sendOpts = { workspace: wsRef, surface: targetSurf };
+
+      // Attach to session first, then run the command separately.
+      // Using `zmx attach session -- cmd` replaces the shell, so if cmd
+      // exits the session dies. Sending the command after attach keeps
+      // an interactive shell underneath.
+      if (surface.session) {
+        await cmux.send(`zmx attach ${surface.session}\n`, sendOpts);
+        if (cmd) {
+          // Wait for the zmx session prompt before sending the command.
+          await cmux.waitForPrompt(wsRef, targetSurf);
+          await cmux.send(`${cmd}\n`, sendOpts);
+        }
+      } else if (cmd) {
+        await cmux.send(`${cmd}\n`, sendOpts);
       }
 
       sessions.push({ name: surface.session!, command: cmd });
