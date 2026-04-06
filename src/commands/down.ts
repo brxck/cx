@@ -61,8 +61,10 @@ export const downCommand = defineCommand({
     // 5. Remove from store
     removeLayout(layout.name);
 
-    // 6. Clean up cmux.json
-    await removeCmuxJsonEntry(layout.name);
+    // 6. Clean up cmux.json (SSH layouts don't generate entries)
+    if (!layout.ssh_mode) {
+      await removeCmuxJsonEntry(layout.name);
+    }
 
     p.outro(`${pc.green("✓")} Layout ${pc.bold(layout.name)} torn down`);
   },

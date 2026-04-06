@@ -193,6 +193,10 @@ async function restoreLayout(layout: LayoutEntry, cliVars: Record<string, string
   }
 
   // 6. Build Cmux layout (connects to existing/restarted sessions)
+  // Preserve SSH mode from the original layout
+  if (layout.ssh_mode) {
+    effectiveTemplate.ssh = true;
+  }
   const { cmuxRef, sessions } = await buildCmuxLayout(
     layout.name,
     effectiveTemplate,
@@ -215,7 +219,7 @@ async function restoreLayout(layout: LayoutEntry, cliVars: Record<string, string
 
   // 10. Regenerate cmux.json entry
   const cmd = await generateCmuxCommand(effectiveTemplate, layout.coder_ws);
-  await writeCmuxJson([cmd]);
+  if (cmd) await writeCmuxJson([cmd]);
 
   spinner.stop(`Restored ${pc.bold(layout.name)} — ${pc.cyan(cmuxRef)}`);
 }

@@ -36,8 +36,10 @@ export const detachCommand = defineCommand({
     // 3. Remove from store
     removeLayout(layout.name);
 
-    // 4. Clean up cmux.json
-    await removeCmuxJsonEntry(layout.name);
+    // 4. Clean up cmux.json (SSH layouts don't generate entries)
+    if (!layout.ssh_mode) {
+      await removeCmuxJsonEntry(layout.name);
+    }
 
     p.outro(
       `${pc.green("✓")} Layout ${pc.bold(layout.name)} detached — workspace ${pc.cyan(layout.coder_ws)} is still running`,

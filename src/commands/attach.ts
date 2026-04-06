@@ -156,7 +156,7 @@ export const attachCommand = defineCommand({
     sshSpinner.stop("SSH config updated");
 
     // 4. Build Cmux layout
-    const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, workspace.name);
+    const { cmuxRef, sessions, sshMode } = await buildCmuxLayout(layoutName, template, workspace.name);
 
     // 5. Port forwarding
     const noPorts = args["no-ports"] as boolean;
@@ -172,6 +172,7 @@ export const attachCommand = defineCommand({
       template: template.name,
       type: template.type,
       path: projectPath,
+      ssh_mode: sshMode,
     });
 
     for (const session of sessions) {
@@ -180,7 +181,7 @@ export const attachCommand = defineCommand({
 
     // 7. Generate cmux.json
     const cmd = await generateCmuxCommand(template, workspace.name);
-    await writeCmuxJson([cmd]);
+    if (cmd) await writeCmuxJson([cmd]);
 
     p.outro(
       `${pc.green("✓")} Layout ${pc.bold(layoutName)} attached — workspace ${pc.cyan(cmuxRef)}`,

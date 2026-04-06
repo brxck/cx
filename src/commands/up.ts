@@ -104,7 +104,7 @@ export const upCommand = defineCommand({
 
     // 5. Generate cmux.json (for later attachment or custom commands)
     const cmd = await generateCmuxCommand(template, coderWsName);
-    await writeCmuxJson([cmd]);
+    if (cmd) await writeCmuxJson([cmd]);
 
     if (args.headless) {
       // Headless: start ZMX sessions without a Cmux layout
@@ -128,7 +128,7 @@ export const upCommand = defineCommand({
     }
 
     // 6. Build Cmux layout
-    const { cmuxRef, sessions } = await buildCmuxLayout(layoutName, template, coderWsName);
+    const { cmuxRef, sessions, sshMode } = await buildCmuxLayout(layoutName, template, coderWsName);
 
     // 7. Save to store (must happen before recordSession due to FK constraint)
     saveLayout({
@@ -138,6 +138,7 @@ export const upCommand = defineCommand({
       template: template.name,
       type: template.type,
       path: projectPath,
+      ssh_mode: sshMode,
     });
 
     for (const session of sessions) {

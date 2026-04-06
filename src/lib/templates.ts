@@ -21,6 +21,8 @@ export interface TemplateConfig {
   color?: string;
   ports?: string[];
   variables?: Record<string, TemplateVariable>;
+  /** Use cmux ssh for managed connections and browser proxying. Default: true. */
+  ssh?: boolean;
   layout: LayoutNode;
 }
 
@@ -225,11 +227,13 @@ interface CmuxSurfaceEntry {
 /**
  * Generate a cmux.json command entry from a template.
  * Terminal commands get wrapped with SSH into the Coder workspace.
+ * Returns null for SSH-mode layouts (custom commands don't support SSH workspaces).
  */
 export async function generateCmuxCommand(
   template: TemplateConfig,
   coderWorkspace: string,
-): Promise<CmuxCommand> {
+): Promise<CmuxCommand | null> {
+  if (template.ssh !== false) return null;
   return {
     name: `${template.name} (${coderWorkspace})`,
     keywords: ["coder", template.name, coderWorkspace],

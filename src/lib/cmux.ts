@@ -70,6 +70,36 @@ export async function tree(opts?: { workspace?: string; all?: boolean }): Promis
   return (await $`cmux tree ${args}`.quiet().text()).trim();
 }
 
+// ── SSH workspaces ──
+
+export interface CmuxSshResult {
+  workspace: string;
+  target: string;
+  state: string;
+}
+
+/** Create an SSH workspace. Returns the workspace ref, target, and connection state. */
+export async function ssh(host: string, opts?: {
+  name?: string;
+  noFocus?: boolean;
+}): Promise<CmuxSshResult> {
+  const args: string[] = [host];
+  if (opts?.name) args.push("--name", opts.name);
+  if (opts?.noFocus) args.push("--no-focus");
+  const output = await $`cmux ssh ${args}`.quiet().text();
+  return parseSshResponse(output.trim());
+}
+
+/** Parse "OK workspace=workspace:N target=host state=connecting" */
+function parseSshResponse(output: string): CmuxSshResult {
+  const pairs = output.replace(/^OK\s+/, "").split(/\s+/);
+  const map = Object.fromEntries(pairs.map((p) => p.split("="))) as Record<string, string>;
+  if (!map.workspace || !map.target || !map.state) {
+    throw new Error(`Unexpected cmux ssh response: ${output}`);
+  }
+  return { workspace: map.workspace, target: map.target, state: map.state };
+}
+
 // ── Create & manage workspaces ──
 
 /** Create a new workspace. Returns the workspace ref (e.g. "workspace:5"). */
@@ -147,7 +177,7 @@ export async function send(
   const args: string[] = [];
   if (opts?.workspace) args.push("--workspace", opts.workspace);
   if (opts?.surface) args.push("--surface", opts.surface);
-  await $`cmux send ${args} ${text}`.quiet();
+  await $`cmux send ${args} -- ${text}`.quiet();
 }
 
 /** Send a key to a surface. */
