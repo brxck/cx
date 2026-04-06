@@ -100,6 +100,35 @@ function parseSshResponse(output: string): CmuxSshResult {
   return { workspace: map.workspace, target: map.target, state: map.state };
 }
 
+/** Wait for an SSH workspace to connect and a shell prompt to appear on a surface. */
+export async function waitForSshReady(
+  wsRef: string,
+  surfaceRef?: string,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const start = Date.now();
+
+  // Wait for SSH connection
+  while (Date.now() - start < timeoutMs) {
+    const output = await $`cmux list-workspaces`.quiet().text();
+    const line = output.split("\n").find((l) => l.includes(wsRef));
+    if (line?.includes("ssh:connected")) break;
+    await Bun.sleep(200);
+  }
+
+  // Wait for shell prompt on the target surface
+  const screenArgs: string[] = ["--workspace", wsRef];
+  if (surfaceRef) screenArgs.push("--surface", surfaceRef);
+  while (Date.now() - start < timeoutMs) {
+    const screen = await $`cmux read-screen ${screenArgs}`.quiet().text();
+    const trimmed = screen.trimEnd();
+    if (trimmed.length > 0 && /[❯$%#>]\s*$/.test(trimmed)) return;
+    await Bun.sleep(200);
+  }
+
+  throw new Error(`SSH workspace ${wsRef} shell did not become ready within ${timeoutMs}ms`);
+}
+
 // ── Create & manage workspaces ──
 
 /** Create a new workspace. Returns the workspace ref (e.g. "workspace:5"). */
@@ -150,6 +179,33 @@ export async function newPane(opts?: {
   if (opts?.type) args.push("--type", opts.type);
   if (opts?.url) args.push("--url", opts.url);
   return parseOkRef(await $`cmux new-pane ${args}`.quiet().text());
+}
+
+/** List surface refs in a pane. */
+export async function listPaneSurfaces(opts?: {
+  workspace?: string;
+  pane?: string;
+}): Promise<string[]> {
+  const args: string[] = [];
+  if (opts?.workspace) args.push("--workspace", opts.workspace);
+  if (opts?.pane) args.push("--pane", opts.pane);
+  const output = await $`cmux list-pane-surfaces ${args}`.quiet().text();
+  return output.trim().split("\n").filter(Boolean).map((line) => {
+    const match = line.trim().match(/^(surface:\d+)/);
+    return match ? match[1]! : line.trim();
+  });
+}
+
+/** Split the current pane. Returns the new surface ref. */
+export async function newSplit(opts: {
+  workspace?: string;
+  surface?: string;
+  direction: "left" | "right" | "up" | "down";
+}): Promise<string> {
+  const args: string[] = [opts.direction];
+  if (opts.workspace) args.push("--workspace", opts.workspace);
+  if (opts.surface) args.push("--surface", opts.surface);
+  return parseOkRef(await $`cmux new-split ${args}`.quiet().text());
 }
 
 /** Create a new surface (tab) within an existing pane. */

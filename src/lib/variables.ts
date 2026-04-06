@@ -26,6 +26,7 @@ export function extractVariables(template: TemplateConfig): string[] {
     if (isPaneNode(node)) {
       for (const surface of node.pane.surfaces) {
         scanString(surface.command);
+        scanString(surface.cwd);
         scanString(surface.url);
       }
     } else if (isSplitNode(node)) {
@@ -110,6 +111,7 @@ function substituteVariables(template: TemplateConfig, vars: Record<string, stri
             ? surface.command.map(replaceVars)
             : replaceVars(surface.command);
         }
+        if (surface.cwd) surface.cwd = replaceVars(surface.cwd);
         if (surface.url) surface.url = replaceVars(surface.url);
       }
     } else if (isSplitNode(node)) {

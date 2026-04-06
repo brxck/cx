@@ -13,7 +13,7 @@ import {
 import { consola } from "consola";
 import { generateSessionName } from "./session-names.ts";
 import { getSessions } from "./store.ts";
-import { sshHost, sshHostWithSession } from "./ssh.ts";
+import { sshHost } from "./ssh.ts";
 
 export interface BuiltLayout {
   cmuxRef: string;
@@ -45,7 +45,7 @@ export async function buildCmuxLayout(
   }
 
   const sessions: Array<{ name: string; command?: string }> = [];
-  await walkLayout(template.layout, wsRef, coderWsName, true, sessions);
+  await walkLayout(template.layout, wsRef, coderWsName, undefined, sessions);
 
   spinner.stop(`Layout built — ${pc.cyan(wsRef)}`);
   return { cmuxRef: wsRef, sessions };
@@ -69,7 +69,7 @@ export async function startHeadlessSessions(
 
   for (const surface of surfaces) {
     const sessionName = surface.session!;
-    const command = normalizeCommand(surface.command) ?? "";
+    const command = normalizeCommand(surface.command, surface.cwd) ?? "";
     const host = await sshHost(coderWsName);
     await Bun.$`ssh ${host} -- zmx run ${sessionName} ${command}`.quiet();
     sessions.push({ name: sessionName, command });
@@ -135,36 +135,34 @@ async function walkLayout(
   node: LayoutNode,
   wsRef: string,
   coderWs: string,
-  isFirst: boolean,
+  surfRef: string | undefined,
   sessions: Array<{ name: string; command?: string }>,
 ): Promise<void> {
   if (isPaneNode(node)) {
-    await configureSurfaces(node, wsRef, coderWs, isFirst, sessions);
+    await configureSurfaces(node, wsRef, surfRef, sessions);
     return;
   }
 
   if (isSplitNode(node)) {
-    await walkLayout(node.children[0], wsRef, coderWs, isFirst, sessions);
+    await walkLayout(node.children[0], wsRef, coderWs, surfRef, sessions);
 
     const direction = node.direction === "horizontal" ? "right" : "down";
-    await cmux.newPane({ workspace: wsRef, direction });
+    const newSurfRef = await cmux.newSplit({ workspace: wsRef, direction });
 
-    await walkLayout(node.children[1], wsRef, coderWs, true, sessions);
+    await walkLayout(node.children[1], wsRef, coderWs, newSurfRef, sessions);
   }
 }
 
 async function configureSurfaces(
   node: PaneNode,
   wsRef: string,
-  coderWs: string,
-  isFirst: boolean,
+  surfRef: string | undefined,
   sessions: Array<{ name: string; command?: string }>,
 ): Promise<void> {
   const surfaces = node.pane.surfaces;
 
   for (let i = 0; i < surfaces.length; i++) {
     const surface = surfaces[i]!;
-    const isFirstSurface = i === 0 && isFirst;
 
     if (surface.type === "browser") {
       await cmux.newSurface({
@@ -172,39 +170,33 @@ async function configureSurfaces(
         type: "browser",
         url: surface.url,
       });
-    } else if (isFirstSurface) {
-      // The SSH workspace surface is already connected to the remote.
-      // Send zmx attach to start the session on it.
-      const cmd = normalizeCommand(surface.command);
-      if (surface.session) {
-        const zmxCmd = cmd
-          ? `zmx attach ${surface.session} -- ${cmd}`
-          : `zmx attach ${surface.session}`;
-        await cmux.send(`${zmxCmd}\n`, { workspace: wsRef });
-      }
-      sessions.push({ name: surface.session!, command: cmd });
     } else {
-      // Secondary terminals: local panes with SSH commands.
-      // No -R socket forwarding needed — the relay daemon handles it.
-      const cmd = normalizeCommand(surface.command);
-      const sshCmd = await buildSshCommand(coderWs, { session: surface.session, command: cmd });
-      const surfRef = await cmux.newSurface({
-        workspace: wsRef,
-        type: "terminal",
-      });
-      await cmux.send(`${sshCmd}\n`, {
-        workspace: wsRef,
-        surface: surfRef,
-      });
+      const cmd = normalizeCommand(surface.command, surface.cwd);
+      const zmxCmd = surface.session
+        ? cmd
+          ? `zmx attach ${surface.session} -- ${cmd}`
+          : `zmx attach ${surface.session}`
+        : cmd;
+
+      // Index 0 uses the surface from the split (or SSH workspace default).
+      // Additional surfaces in the same pane need newSurface.
+      let targetSurf = surfRef;
+      if (i > 0) {
+        targetSurf = await cmux.newSurface({
+          workspace: wsRef,
+          type: "terminal",
+        });
+      }
+
+      if (zmxCmd) {
+        consola.debug(`send to surface=${targetSurf ?? "default"}: ${zmxCmd}`);
+        await cmux.send(`${zmxCmd}\n`, {
+          workspace: wsRef,
+          surface: targetSurf,
+        });
+      }
+
       sessions.push({ name: surface.session!, command: cmd });
     }
   }
-}
-
-async function buildSshCommand(coderWs: string, opts?: { session?: string; command?: string }): Promise<string> {
-  const host = opts?.session
-    ? await sshHostWithSession(coderWs, opts.session)
-    : await sshHost(coderWs);
-  const remoteCmd = opts?.command ? ` -t '${opts.command}'` : "";
-  return `ssh ${host}${remoteCmd}`;
 }

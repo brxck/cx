@@ -41,6 +41,7 @@ export interface SurfaceConfig {
   type: "terminal" | "browser";
   session?: string;
   command?: string | string[];
+  cwd?: string;
   url?: string;
   focus?: boolean;
 }
@@ -53,11 +54,21 @@ export function isPaneNode(node: LayoutNode): node is PaneNode {
   return "pane" in node;
 }
 
-/** Normalize a command field (string or string[]) into a single shell string. */
-export function normalizeCommand(cmd: string | string[] | undefined): string | undefined {
-  if (cmd == null) return undefined;
-  if (Array.isArray(cmd)) return cmd.join(" && ");
-  return cmd;
+/** Normalize a command field (string or string[]) into a single shell string, optionally prepending a cd to cwd. */
+export function normalizeCommand(cmd: string | string[] | undefined, cwd?: string): string | undefined {
+  let result: string | undefined;
+  if (cmd == null) {
+    result = undefined;
+  } else if (Array.isArray(cmd)) {
+    result = cmd.join(" && ");
+  } else {
+    result = cmd;
+  }
+
+  if (cwd) {
+    return result ? `cd ${cwd} && ${result}` : `cd ${cwd}`;
+  }
+  return result;
 }
 
 // ── Template management ──
