@@ -89,7 +89,8 @@ export function CreateWorkspace() {
 
   // SSE streaming or done
   if (state !== "idle") {
-    const currentStage = events.length > 0 ? events[events.length - 1]!.stage : null;
+    const stageEvents = events.filter((e) => e.stage !== "log");
+    const currentStage = stageEvents.length > 0 ? stageEvents[stageEvents.length - 1]!.stage : null;
 
     return (
       <div style={page}>

@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import type { UpEvent } from "../api";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -29,6 +30,22 @@ const dot: React.CSSProperties = {
   marginTop: 1,
 };
 
+const logBox: React.CSSProperties = {
+  marginTop: 8,
+  padding: "8px 10px",
+  background: "var(--bg)",
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  maxHeight: 200,
+  overflow: "auto",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontSize: 11,
+  lineHeight: 1.5,
+  color: "var(--text-dim)",
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-all",
+};
+
 export function ProgressSteps({
   events,
   currentStage,
@@ -36,9 +53,20 @@ export function ProgressSteps({
   events: UpEvent[];
   currentStage: string | null;
 }) {
+  const logRef = useRef<HTMLDivElement>(null);
+  const stages = events.filter((e) => e.stage !== "log");
+  const logs = events.filter((e) => e.stage === "log").map((e) => e.message);
+  const isStreaming = currentStage && currentStage !== "done" && currentStage !== "error";
+
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [logs.length]);
+
   return (
     <div style={{ padding: "8px 0" }}>
-      {events.map((event, i) => {
+      {stages.map((event, i) => {
         const isActive = event.stage === currentStage;
         const isDone = !isActive && event.stage !== "error";
         const isError = event.stage === "error";
@@ -69,6 +97,12 @@ export function ProgressSteps({
           </div>
         );
       })}
+
+      {logs.length > 0 && isStreaming && (
+        <div ref={logRef} style={logBox}>
+          {logs.join("\n")}
+        </div>
+      )}
     </div>
   );
 }

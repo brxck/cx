@@ -34,7 +34,6 @@ export async function handleUp(req: Request): Promise<Response> {
         }
 
         // 2. Create/start Coder workspace
-        send("creating", `Creating workspace ${body.workspace}`);
         await ensureCoderWorkspace(body.workspace, template, send);
 
         // 3. SSH config
@@ -98,6 +97,8 @@ async function ensureCoderWorkspace(
   const workspaces = await listCoderWorkspaces();
   const existing = workspaces.find((ws) => ws.name === name);
 
+  const onLog = (line: string) => send("log", line);
+
   if (!existing) {
     send("creating", `Creating workspace ${name}`);
     await createWorkspace(name, template.coder.template, {
@@ -105,7 +106,7 @@ async function ensureCoderWorkspace(
       preset: template.coder.preset,
     });
     send("waiting", "Waiting for agent to be ready");
-    await waitForWorkspace(name);
+    await waitForWorkspace(name, undefined, onLog);
     return;
   }
 
@@ -119,10 +120,10 @@ async function ensureCoderWorkspace(
     send("creating", `Starting workspace ${name}`);
     await startWorkspace(name);
     send("waiting", "Waiting for agent to be ready");
-    await waitForWorkspace(name);
+    await waitForWorkspace(name, undefined, onLog);
     return;
   }
 
   send("waiting", `Workspace is ${status}, waiting for it to be ready`);
-  await waitForWorkspace(name);
+  await waitForWorkspace(name, undefined, onLog);
 }

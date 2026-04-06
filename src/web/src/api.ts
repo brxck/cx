@@ -1,34 +1,13 @@
 const BASE = "";
 
-export interface LayoutStatus {
+export interface WorkspaceInfo {
   name: string;
-  type: string;
-  template: string | null;
-  path: string | null;
-  createdAt: string;
-  lastActiveAt: string;
-  coderWorkspace: string;
-  coderStatus: string;
-  coderHealthy: boolean;
-  coderOutdated: boolean;
-  coderBuildAge: string;
-  coderTemplateName: string | null;
-  cmuxRef: string;
-  cmuxActive: boolean;
-  cmuxSelected: boolean;
-  gitBranch: string | null;
-  gitDirty: boolean;
-  pr: string | null;
-  claudeStatus: string | null;
-  portForwards: string[];
+  status: string;
+  healthy: boolean;
+  outdated: boolean;
+  buildAge: string;
+  templateName: string;
   sessions: string[];
-}
-
-export interface CoderWorkspace {
-  name: string;
-  template_name: string;
-  latest_build: { status: string; transition: string; created_at: string };
-  health: { healthy: boolean };
 }
 
 export interface TemplateEntry {
@@ -39,8 +18,7 @@ export interface TemplateEntry {
 }
 
 export interface StatusResponse {
-  layouts: LayoutStatus[];
-  untracked: CoderWorkspace[];
+  workspaces: WorkspaceInfo[];
 }
 
 export interface TemplatesResponse {

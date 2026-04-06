@@ -1,22 +1,9 @@
 import { useState, useEffect } from "react";
-import type { CoderWorkspace, AppEntry } from "../api";
-import { stopWorkspace, startWorkspace, fetchApps } from "../api";
+import type { WorkspaceInfo, AppEntry } from "../api";
+import { stopWorkspace, startWorkspace, fetchApps, tearDown } from "../api";
 import { StatusBadge } from "./StatusBadge";
 import { IconMenu, type MenuItem } from "./IconMenu";
-import { ExternalLink, MoreVertical } from "lucide-react";
-
-function workspaceStatus(ws: CoderWorkspace): string {
-  const { status, transition } = ws.latest_build;
-  if (status === "running" && transition === "start") return "running";
-  if (status === "running" && transition === "stop") return "stopped";
-  if (status === "succeeded" && transition === "stop") return "stopped";
-  if (status === "starting") return "starting";
-  if (status === "stopping") return "stopping";
-  if (status === "failed") return "failed";
-  if (transition === "stop") return "stopped";
-  if (transition === "start") return "running";
-  return "unknown";
-}
+import { TerminalSquare, ExternalLink, MoreVertical } from "lucide-react";
 
 const card: React.CSSProperties = {
   background: "var(--surface)",
@@ -24,7 +11,6 @@ const card: React.CSSProperties = {
   borderRadius: "var(--radius)",
   padding: 16,
   marginBottom: 12,
-  opacity: 0.7,
 };
 
 const dim: React.CSSProperties = { color: "var(--text-dim)", fontSize: 13 };
@@ -33,14 +19,15 @@ export function WorkspaceCard({
   workspace,
   onRefresh,
 }: {
-  workspace: CoderWorkspace;
+  workspace: WorkspaceInfo;
   onRefresh: () => void;
 }) {
   const [toggling, setToggling] = useState(false);
+  const [tearing, setTearing] = useState(false);
   const [apps, setApps] = useState<{ dashboard: string; terminal: string; apps: AppEntry[] } | null>(null);
-  const status = workspaceStatus(workspace);
-  const isRunning = status === "running";
-  const isStopped = status === "stopped";
+
+  const isRunning = workspace.status === "running";
+  const isStopped = workspace.status === "stopped";
 
   useEffect(() => {
     fetchApps(workspace.name).then(setApps).catch(() => {});
@@ -57,6 +44,23 @@ export function WorkspaceCard({
     onRefresh();
   };
 
+  const handleTearDown = async () => {
+    setTearing(true);
+    await tearDown(workspace.name, true);
+    setTearing(false);
+    onRefresh();
+  };
+
+  // Sessions menu: web terminals attached to ZMX sessions
+  const sessionItems: MenuItem[] = [];
+  if (apps && workspace.sessions.length > 0) {
+    for (const session of workspace.sessions) {
+      const cmd = `zmx attach ${session}`;
+      const url = `${apps.terminal}?command=${encodeURIComponent(cmd)}`;
+      sessionItems.push({ label: session, href: url });
+    }
+  }
+
   // Open menu: terminal + extra apps
   const openItems: MenuItem[] = [];
   if (apps) {
@@ -66,7 +70,7 @@ export function WorkspaceCard({
     }
   }
 
-  // Actions menu: dashboard + start/stop
+  // Actions menu: dashboard + start/stop + tear down
   const actionItems: MenuItem[] = [];
   if (apps) {
     actionItems.push({ label: "Dashboard", href: apps.dashboard, color: "var(--accent)" });
@@ -85,23 +89,39 @@ export function WorkspaceCard({
       disabled: toggling,
     });
   }
+  if (workspace.sessions.length > 0) {
+    actionItems.push({
+      label: tearing ? "Tearing down..." : "Tear Down",
+      color: "var(--red)",
+      onClick: handleTearDown,
+      disabled: tearing,
+    });
+  }
 
   return (
     <div style={card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 4 }}>
+          <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
             {workspace.name}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <StatusBadge status={status} />
-            <span style={dim}>{workspace.template_name}</span>
-          </div>
+          <StatusBadge status={workspace.status} />
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" />
           <IconMenu icon={<ExternalLink size={16} />} items={openItems} title="Open" />
           <IconMenu icon={<MoreVertical size={16} />} items={actionItems} title="Actions" />
         </div>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <span style={dim}>{workspace.templateName}</span>
+        <span style={dim}>{workspace.buildAge} ago</span>
+        {workspace.sessions.length > 0 && (
+          <span style={dim}>
+            {workspace.sessions.length} session{workspace.sessions.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
     </div>
   );

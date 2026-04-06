@@ -39,7 +39,6 @@ export interface PaneNode {
 
 export interface SurfaceConfig {
   type: "terminal" | "browser";
-  name?: string;
   session?: string;
   command?: string | string[];
   url?: string;

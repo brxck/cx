@@ -41,6 +41,7 @@ const itemStyle: React.CSSProperties = {
   width: "100%",
   padding: "8px 12px",
   fontSize: 13,
+  fontWeight: 500,
   background: "none",
   border: "none",
   borderRadius: 6,
