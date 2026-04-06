@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { ensureSshConfig, workspaceStatus } from "../lib/coder.ts";
+import { ensureSshConfig, workspaceStatus, requireCoderLogin } from "../lib/coder.ts";
 import {
   resolveTemplate,
   type TemplateConfig,
@@ -40,6 +40,8 @@ export const attachCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     // 1. Pick Coder workspace
     const workspace = await pickWorkspace({
       filter: args.workspace as string | undefined,

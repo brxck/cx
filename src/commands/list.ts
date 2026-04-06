@@ -9,6 +9,7 @@ import {
   workspaceStatus,
   openInBrowser,
   sshIntoWorkspace,
+  requireCoderLogin,
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import { formatWorkspaceLabel, fuzzyMatch } from "../lib/workspace-picker.ts";
@@ -31,6 +32,8 @@ export const listCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     const spinner = p.spinner();
     spinner.start("Fetching workspaces");
 

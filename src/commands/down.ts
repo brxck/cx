@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { stopWorkspace } from "../lib/coder.ts";
+import { stopWorkspace, requireCoderLogin } from "../lib/coder.ts";
 import * as cmux from "../lib/cmux.ts";
 import { getAllLayouts, getLayout, getLayoutsByPath, removeLayout, type LayoutEntry } from "../lib/store.ts";
 import { pickLayout } from "../lib/workspace-picker.ts";
@@ -29,6 +29,8 @@ export const downCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     // 1. Resolve layout
     const layout = await resolveLayout(args.layout as string | undefined);
     if (!layout) return;

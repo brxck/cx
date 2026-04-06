@@ -9,6 +9,7 @@ import {
   startWorkspace,
   waitForWorkspace,
   ensureSshConfig,
+  requireCoderLogin,
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import {
@@ -52,6 +53,8 @@ export const upCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     // 1. Resolve template (project-local → named → interactive picker)
     const resolved = await resolveTemplateFromLib({
       name: args.template as string | undefined,

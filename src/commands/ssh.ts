@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { sshIntoWorkspace } from "../lib/coder.ts";
+import { sshIntoWorkspace, requireCoderLogin } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 import { getSessions, recordSession } from "../lib/store.ts";
 import { generateSessionName } from "../lib/session-names.ts";
@@ -32,6 +32,8 @@ export const sshCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace to SSH into",

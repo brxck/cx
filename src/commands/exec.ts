@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
-import { execOnWorkspace, workspaceStatus } from "../lib/coder.ts";
+import { execOnWorkspace, workspaceStatus, requireCoderLogin } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
 export const execCommand = defineCommand({
@@ -17,6 +17,8 @@ export const execCommand = defineCommand({
     },
   },
   async run({ args, rawArgs }) {
+    await requireCoderLogin();
+
     // Everything after "--" is the command to execute
     const dashIdx = rawArgs.indexOf("--");
     const command = dashIdx >= 0 ? rawArgs.slice(dashIdx + 1) : [];

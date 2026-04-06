@@ -9,6 +9,7 @@ import {
   openInVSCode,
   listOpenableApps,
   openWorkspaceApp,
+  requireCoderLogin,
 } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
@@ -31,6 +32,8 @@ export const openCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace to open",

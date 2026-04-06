@@ -1,4 +1,5 @@
 import { $ } from "bun";
+import { consola } from "consola";
 import { sshHost } from "./ssh.ts";
 
 export interface CoderWorkspace {
@@ -35,6 +36,18 @@ export interface CoderWorkspace {
     healthy: boolean;
     failing_agents: string[];
   };
+}
+
+/** Check that the user is logged in to Coder. Exits with a friendly error if not. */
+export async function requireCoderLogin(): Promise<void> {
+  try {
+    await $`coder whoami`.quiet();
+  } catch {
+    consola.error(
+      "Not logged in to Coder. Run `coder login` to authenticate.",
+    );
+    process.exit(1);
+  }
 }
 
 /** Format a timestamp as a human-readable relative time string. */
@@ -145,13 +158,36 @@ export async function startWorkspace(name: string): Promise<void> {
 export async function waitForWorkspace(
   name: string,
   timeoutMs = 5 * 60 * 1000,
+  onLog?: (line: string) => void,
 ): Promise<void> {
   // Stream build logs in the background
   const logProc = Bun.spawn(["coder", "logs", "-f", name], {
     stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
+    stdout: onLog ? "pipe" : "inherit",
+    stderr: onLog ? "pipe" : "inherit",
   });
+
+  // Pipe log lines to callback if provided
+  if (onLog && logProc.stdout) {
+    (async () => {
+      const reader = logProc.stdout!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop()!;
+          for (const line of lines) {
+            if (line.trim()) onLog(line);
+          }
+        }
+        if (buffer.trim()) onLog(buffer);
+      } catch {}
+    })();
+  }
 
   try {
     const start = Date.now();

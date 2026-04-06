@@ -2,6 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import { requireCoderLogin } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
 /** Check if a local TCP port is already in use. */
@@ -66,6 +67,8 @@ export const portForwardCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace for port forwarding",

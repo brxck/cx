@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
-import { streamLogs } from "../lib/coder.ts";
+import { streamLogs, requireCoderLogin } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
 export const logsCommand = defineCommand({
@@ -29,6 +29,8 @@ export const logsCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace to view logs",

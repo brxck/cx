@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
-import { workspaceStatus, relativeTime, type CoderWorkspace } from "../lib/coder.ts";
+import { workspaceStatus, relativeTime, requireCoderLogin, type CoderWorkspace } from "../lib/coder.ts";
 import { type LayoutStatus, gatherStatus } from "../lib/status.ts";
 
 // ── Rendering ──
@@ -157,6 +157,8 @@ export const statusCommand = defineCommand({
     layout: { type: "string", description: "Show a specific layout" },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     const result = await gatherStatus();
 
     if (!result.cmuxAlive && !args.json) {

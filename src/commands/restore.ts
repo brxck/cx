@@ -9,6 +9,7 @@ import {
   startWorkspace,
   waitForWorkspace,
   ensureSshConfig,
+  requireCoderLogin,
 } from "../lib/coder.ts";
 import {
   getTemplate,
@@ -54,6 +55,8 @@ export const restoreCommand = defineCommand({
     },
   },
   async run({ args }) {
+    await requireCoderLogin();
+
     const allLayouts = getAllLayouts();
     let layouts = args.layout
       ? allLayouts.filter((l) => l.name === args.layout)
