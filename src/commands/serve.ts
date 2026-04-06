@@ -32,7 +32,7 @@ export const serveCommand = defineCommand({
       type: "string",
       alias: "p",
       description: "Port to listen on",
-      default: "3333",
+      default: "8080",
     },
   },
   async run({ args }) {
