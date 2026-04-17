@@ -197,7 +197,12 @@ export async function waitForWorkspace(
       if (ws && workspaceStatus(ws) === "running") {
         const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
         const allConnected = agents.length > 0 && agents.every((a) => a.status === "connected");
-        if (allConnected) return;
+        const allReady = allConnected && agents.every((a) => a.lifecycle_state === "ready");
+        if (allReady) return;
+        if (allConnected && agents.some((a) => a.lifecycle_state === "start_error" || a.lifecycle_state === "start_timeout")) {
+          const bad = agents.find((a) => a.lifecycle_state === "start_error" || a.lifecycle_state === "start_timeout")!;
+          throw new Error(`Agent ${bad.name} startup ${bad.lifecycle_state} for workspace "${name}"`);
+        }
       }
       await Bun.sleep(3000);
     }

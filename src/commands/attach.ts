@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { ensureSshConfig, workspaceStatus, requireCoderLogin } from "../lib/coder.ts";
+import { ensureSshConfig, workspaceStatus, requireCoderLogin, startWorkspace, waitForWorkspace } from "../lib/coder.ts";
 import {
   resolveTemplate,
   type TemplateConfig,
@@ -62,10 +62,26 @@ export const attachCommand = defineCommand({
 
     const status = workspaceStatus(workspace);
     if (status !== "running") {
-      p.log.error(
-        `Workspace ${pc.bold(workspace.name)} is ${status} — it must be running to attach`,
-      );
-      process.exit(1);
+      if (status === "stopped") {
+        const shouldStart = await p.confirm({
+          message: `Workspace ${pc.bold(workspace.name)} is stopped. Start it?`,
+          initialValue: true,
+        });
+        if (p.isCancel(shouldStart) || !shouldStart) {
+          p.cancel("Cancelled.");
+          process.exit(0);
+        }
+        const spinner = p.spinner();
+        spinner.start(`Starting workspace ${pc.bold(workspace.name)}`);
+        await startWorkspace(workspace.name);
+        await waitForWorkspace(workspace.name);
+        spinner.stop(`Workspace ${pc.bold(workspace.name)} started and ready`);
+      } else {
+        p.log.error(
+          `Workspace ${pc.bold(workspace.name)} is ${status} — it must be running to attach`,
+        );
+        process.exit(1);
+      }
     }
 
     const layoutName = workspace.name;
