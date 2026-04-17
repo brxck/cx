@@ -46,12 +46,39 @@ export interface SurfaceConfig {
   focus?: boolean;
 }
 
-export function isSplitNode(node: LayoutNode): node is SplitNode {
-  return "direction" in node;
+export function isSplitNode(node: unknown): node is SplitNode {
+  return typeof node === "object" && node !== null && "direction" in node;
 }
 
-export function isPaneNode(node: LayoutNode): node is PaneNode {
-  return "pane" in node;
+export function isPaneNode(node: unknown): node is PaneNode {
+  return typeof node === "object" && node !== null && "pane" in node;
+}
+
+/** Recursively validate a layout tree; throws a descriptive error naming the offending path. */
+export function validateLayout(node: unknown, path = "layout"): void {
+  if (typeof node !== "object" || node === null) {
+    throw new Error(`Invalid template layout at ${path}: expected pane or split node, got ${node === undefined ? "undefined" : typeof node}`);
+  }
+  if (isSplitNode(node)) {
+    const split = node as SplitNode;
+    if (split.direction !== "horizontal" && split.direction !== "vertical") {
+      throw new Error(`Invalid template layout at ${path}.direction: expected "horizontal" or "vertical", got ${JSON.stringify(split.direction)}`);
+    }
+    if (!Array.isArray(split.children) || split.children.length !== 2) {
+      throw new Error(`Invalid template layout at ${path}.children: expected exactly two children, got ${Array.isArray(split.children) ? split.children.length : typeof split.children}`);
+    }
+    validateLayout(split.children[0], `${path}.children[0]`);
+    validateLayout(split.children[1], `${path}.children[1]`);
+    return;
+  }
+  if (isPaneNode(node)) {
+    const pane = (node as PaneNode).pane;
+    if (typeof pane !== "object" || pane === null || !Array.isArray(pane.surfaces)) {
+      throw new Error(`Invalid template layout at ${path}.pane.surfaces: expected an array`);
+    }
+    return;
+  }
+  throw new Error(`Invalid template layout at ${path}: expected pane or split node`);
 }
 
 /** Normalize a command field (string or string[]) into a single shell string, optionally prepending a cd to cwd. */
@@ -103,6 +130,11 @@ export async function listTemplatesAsync(): Promise<TemplateConfig[]> {
     files.map(async (f) => {
       const t = await Bun.file(join(TEMPLATES_DIR, f)).json() as TemplateConfig;
       if (!t.name) t.name = nameFromFile(f);
+      try {
+        validateLayout(t.layout);
+      } catch (err) {
+        throw new Error(`Template "${t.name}" (${f}) is invalid: ${(err as Error).message}`);
+      }
       return t;
     }),
   );
@@ -114,6 +146,11 @@ export async function getTemplate(name: string): Promise<TemplateConfig | null> 
   if (!existsSync(path)) return null;
   const t = await Bun.file(path).json() as TemplateConfig;
   if (!t.name) t.name = name;
+  try {
+    validateLayout(t.layout);
+  } catch (err) {
+    throw new Error(`Template "${t.name}" (${path}) is invalid: ${(err as Error).message}`);
+  }
   return t;
 }
 
@@ -134,21 +171,37 @@ export async function getProjectTemplates(dir?: string): Promise<{ templates: Te
   const localPath = join(startDir, "cx.json");
   if (existsSync(localPath)) {
     const data = await Bun.file(localPath).json() as { templates: TemplateConfig[] };
+    for (const t of data.templates ?? []) {
+      try {
+        validateLayout(t.layout);
+      } catch (err) {
+        throw new Error(`Template "${t.name}" in ${localPath} is invalid: ${(err as Error).message}`);
+      }
+    }
     return { templates: data.templates, projectPath: startDir };
   }
 
   // Fall back to git root
+  let gitRoot = "";
   try {
     const result = Bun.spawnSync(["git", "-C", startDir, "rev-parse", "--show-toplevel"]);
-    const gitRoot = result.stdout.toString().trim();
-    if (gitRoot && gitRoot !== startDir) {
-      const rootPath = join(gitRoot, "cx.json");
-      if (existsSync(rootPath)) {
-        const data = await Bun.file(rootPath).json() as { templates: TemplateConfig[] };
-        return { templates: data.templates, projectPath: gitRoot };
-      }
-    }
+    gitRoot = result.stdout.toString().trim();
   } catch {}
+
+  if (gitRoot && gitRoot !== startDir) {
+    const rootPath = join(gitRoot, "cx.json");
+    if (existsSync(rootPath)) {
+      const data = await Bun.file(rootPath).json() as { templates: TemplateConfig[] };
+      for (const t of data.templates ?? []) {
+        try {
+          validateLayout(t.layout);
+        } catch (err) {
+          throw new Error(`Template "${t.name}" in ${rootPath} is invalid: ${(err as Error).message}`);
+        }
+      }
+      return { templates: data.templates, projectPath: gitRoot };
+    }
+  }
 
   return null;
 }
