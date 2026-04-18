@@ -1,5 +1,4 @@
 import { defineCommand } from "citty";
-import { consola } from "consola";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import {
@@ -10,10 +9,13 @@ import {
   waitForWorkspace,
   ensureSshConfig,
   requireCoderLogin,
+  listCoderTemplates,
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import {
   resolveTemplate as resolveTemplateFromLib,
+  listTemplatesAsync,
+  getProjectTemplates,
   type TemplateConfig,
 } from "../lib/templates.ts";
 import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
@@ -55,15 +57,8 @@ export const upCommand = defineCommand({
   async run({ args }) {
     await requireCoderLogin();
 
-    // 1. Resolve template (project-local → named → interactive picker)
-    const resolved = await resolveTemplateFromLib({
-      name: args.template as string | undefined,
-    });
-    if (!resolved) {
-      consola.error("No template found. Create one at ~/.config/cx/templates/ or add a cx.json to your project.");
-      process.exit(1);
-    }
-    const { template, projectPath } = resolved;
+    // 1. Resolve template (project-local → named → interactive picker with default fallback)
+    const { template, projectPath } = await resolveTemplateOrDefault(args.template as string | undefined);
 
     // Resolve template variables before anything consumes commands/URLs
     const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
@@ -190,3 +185,116 @@ async function ensureCoderWorkspace(
   p.log.success(`Workspace ${pc.bold(name)} is ready`);
 }
 
+// ── Template resolution ──
+
+async function resolveTemplateOrDefault(
+  name: string | undefined,
+): Promise<{ template: TemplateConfig; projectPath: string | null }> {
+  if (name) {
+    if (name === "default") return buildDefaultTemplate("persistent");
+    if (name === "default-ephemeral") return buildDefaultTemplate("ephemeral");
+    const resolved = await resolveTemplateFromLib({ name });
+    if (!resolved) {
+      p.log.error(`Template ${pc.bold(name)} not found`);
+      process.exit(1);
+    }
+    return { template: resolved.template, projectPath: resolved.projectPath };
+  }
+
+  const project = await getProjectTemplates();
+  const projectTemplates = project?.templates ?? [];
+  const globalTemplates = await listTemplatesAsync();
+
+  type PickerEntry = {
+    template: TemplateConfig | null;
+    source: "project" | "global" | "default";
+    defaultType?: "persistent" | "ephemeral";
+  };
+
+  const entries: PickerEntry[] = [
+    ...projectTemplates.map((t) => ({ template: t, source: "project" as const })),
+    ...globalTemplates.map((t) => ({ template: t, source: "global" as const })),
+    { template: null, source: "default" as const, defaultType: "persistent" as const },
+    { template: null, source: "default" as const, defaultType: "ephemeral" as const },
+  ];
+
+  entries.sort((a, b) => {
+    if (a.source === "default" && b.source === "default") {
+      return a.defaultType === "persistent" ? -1 : 1;
+    }
+    if (a.source === "default") return 1;
+    if (b.source === "default") return -1;
+    return a.template!.name.localeCompare(b.template!.name);
+  });
+
+  const choice = await p.autocomplete({
+    message: "Select a template",
+    options: entries.map((e) => ({
+      value: e,
+      label:
+        e.source === "default"
+          ? `${pc.bold(e.defaultType === "ephemeral" ? "default-ephemeral" : "default")}  ${pc.dim("single pane")}  ${pc.dim(e.defaultType!)}`
+          : `${pc.bold(e.template!.name)}  ${pc.dim(e.template!.coder.template)}  ${pc.dim(e.template!.type)}${e.source === "project" ? `  ${pc.dim("(project)")}` : ""}`,
+    })),
+    placeholder: "Type to filter",
+  });
+
+  if (p.isCancel(choice)) {
+    p.cancel("Cancelled.");
+    process.exit(0);
+  }
+  const picked = choice as PickerEntry;
+
+  if (picked.source === "default") {
+    return buildDefaultTemplate(picked.defaultType!);
+  }
+
+  return {
+    template: picked.template!,
+    projectPath: picked.source === "project" ? (project?.projectPath ?? null) : null,
+  };
+}
+
+async function buildDefaultTemplate(
+  type: "persistent" | "ephemeral",
+): Promise<{ template: TemplateConfig; projectPath: null }> {
+  const spinner = p.spinner();
+  spinner.start("Loading Coder templates");
+  const coderTemplates = await listCoderTemplates();
+  spinner.stop(`Found ${coderTemplates.length} Coder template${coderTemplates.length === 1 ? "" : "s"}`);
+
+  if (coderTemplates.length === 0) {
+    p.log.error("No Coder templates available. Ask your admin to create one.");
+    process.exit(1);
+  }
+
+  coderTemplates.sort((a, b) => a.name.localeCompare(b.name));
+
+  const choice = await p.autocomplete({
+    message: "Select a Coder template",
+    options: coderTemplates.map((t) => ({
+      value: t.name,
+      label: `${pc.bold(t.name)}${t.description ? `  ${pc.dim(t.description)}` : ""}`,
+    })),
+    placeholder: "Type to filter",
+  });
+
+  if (p.isCancel(choice)) {
+    p.cancel("Cancelled.");
+    process.exit(0);
+  }
+
+  return {
+    template: {
+      name: type === "ephemeral" ? "default-ephemeral" : "default",
+      coder: { template: choice as string },
+      type,
+      layout: {
+        pane: {
+          surfaces: [{ type: "terminal" }],
+        },
+      },
+    },
+    projectPath: null,
+  };
+}

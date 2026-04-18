@@ -68,7 +68,22 @@ export async function runAttach(opts: RunAttachOpts): Promise<void> {
   let template: TemplateConfig;
   let projectPath: string | null = null;
 
-  if (opts.template) {
+  const buildDefault = (type: "persistent" | "ephemeral"): TemplateConfig => ({
+    name: type === "ephemeral" ? "default-ephemeral" : "default",
+    coder: { template: workspace.template_name },
+    type,
+    layout: {
+      pane: {
+        surfaces: [{ type: "terminal" }],
+      },
+    },
+  });
+
+  if (opts.template === "default") {
+    template = buildDefault("persistent");
+  } else if (opts.template === "default-ephemeral") {
+    template = buildDefault("ephemeral");
+  } else if (opts.template) {
     const resolved = await resolveTemplate({ name: opts.template });
     if (resolved) {
       template = resolved.template;
@@ -78,58 +93,51 @@ export async function runAttach(opts: RunAttachOpts): Promise<void> {
       process.exit(1);
     }
   } else {
-    const defaultTemplate: TemplateConfig = {
-      name: "default",
-      coder: { template: workspace.template_name },
-      type: "persistent",
-      layout: {
-        pane: {
-          surfaces: [{ type: "terminal" }],
-        },
-      },
-    };
-
     const project = await getProjectTemplates();
     const projectTemplates = project?.templates ?? [];
     const globalTemplates = await listTemplatesAsync();
 
-    type PickerEntry = { template: TemplateConfig; source: "project" | "global" | "default" };
+    type PickerEntry = {
+      template: TemplateConfig;
+      source: "project" | "global" | "default";
+      defaultType?: "persistent" | "ephemeral";
+    };
     const entries: PickerEntry[] = [
       ...projectTemplates.map((t) => ({ template: t, source: "project" as const })),
       ...globalTemplates.map((t) => ({ template: t, source: "global" as const })),
-      { template: defaultTemplate, source: "default" as const },
+      { template: buildDefault("persistent"), source: "default" as const, defaultType: "persistent" as const },
+      { template: buildDefault("ephemeral"), source: "default" as const, defaultType: "ephemeral" as const },
     ];
 
     entries.sort((a, b) => {
+      if (a.source === "default" && b.source === "default") {
+        return a.defaultType === "persistent" ? -1 : 1;
+      }
       if (a.source === "default") return 1;
       if (b.source === "default") return -1;
       return a.template.name.localeCompare(b.template.name);
     });
 
-    if (entries.length === 1) {
-      template = defaultTemplate;
-    } else {
-      const choice = await p.autocomplete({
-        message: "Select a template",
-        options: entries.map((e) => ({
-          value: e,
-          label:
-            e.source === "default"
-              ? `${pc.bold("default")}  ${pc.dim("single pane")}`
-              : `${pc.bold(e.template.name)}  ${pc.dim(e.template.coder.template)}  ${pc.dim(e.template.type)}${e.source === "project" ? `  ${pc.dim("(project)")}` : ""}`,
-        })),
-        placeholder: "Type to filter",
-      });
+    const choice = await p.autocomplete({
+      message: "Select a template",
+      options: entries.map((e) => ({
+        value: e,
+        label:
+          e.source === "default"
+            ? `${pc.bold(e.template.name)}  ${pc.dim("single pane")}  ${pc.dim(e.defaultType!)}`
+            : `${pc.bold(e.template.name)}  ${pc.dim(e.template.coder.template)}  ${pc.dim(e.template.type)}${e.source === "project" ? `  ${pc.dim("(project)")}` : ""}`,
+      })),
+      placeholder: "Type to filter",
+    });
 
-      if (p.isCancel(choice)) {
-        p.cancel("Cancelled.");
-        process.exit(0);
-      }
-
-      const picked = choice as PickerEntry;
-      template = picked.template;
-      projectPath = picked.source === "project" ? (project?.projectPath ?? null) : null;
+    if (p.isCancel(choice)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
     }
+
+    const picked = choice as PickerEntry;
+    template = picked.template;
+    projectPath = picked.source === "project" ? (project?.projectPath ?? null) : null;
   }
 
   const runCommands = opts.runCommands ?? false;
@@ -204,7 +212,7 @@ export const attachCommand = defineCommand({
     "run-commands": {
       type: "boolean",
       alias: "r",
-      description: "Run template commands after attaching ZMX sessions (also enables variable prompts)",
+      description: "Run template commands after attaching",
       default: false,
     },
     vars: {

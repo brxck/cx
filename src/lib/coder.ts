@@ -71,6 +71,22 @@ export async function listWorkspaces(): Promise<CoderWorkspace[]> {
   return result.json() as Promise<CoderWorkspace[]>;
 }
 
+export interface CoderTemplate {
+  name: string;
+  display_name: string;
+  description: string;
+  deprecated: boolean;
+}
+
+/** List available Coder templates. Filters out deprecated templates. */
+export async function listCoderTemplates(): Promise<CoderTemplate[]> {
+  const result = await $`coder templates list --output json`.quiet();
+  const raw = (await result.json()) as Array<{ Template: CoderTemplate }>;
+  return raw
+    .map((entry) => entry.Template)
+    .filter((t) => !t.deprecated);
+}
+
 /** Get the Coder deployment URL from `coder whoami`. */
 export async function getCoderUrl(): Promise<string> {
   const output = await $`coder whoami`.quiet().text();
