@@ -75,7 +75,7 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
   },
   {
     id: "dashboard",
-    label: "Open in Coder dashboard",
+    label: "Open dashboard",
     group: "navigation",
     hint: ({ ws, coderBaseUrl }) => dashboardUrl(coderBaseUrl, ws.owner_name, ws.name),
     isAvailable: () => true,
@@ -89,7 +89,7 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
   // ── Interact ──
   {
     id: "ssh",
-    label: "SSH into workspace",
+    label: "Open SSH",
     group: "interact",
     isAvailable: ({ ws }) => isRunning(ws),
     async run({ ws }) {
@@ -98,7 +98,7 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
   },
   {
     id: "ports",
-    label: "Port forwarding",
+    label: "Forward ports",
     group: "interact",
     isAvailable: ({ ws }) => isRunning(ws),
     async run({ ws }) {
@@ -134,15 +134,6 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
     async run({ ws }) {
       const exitCode = await runLogs({ ws, follow: true });
       process.exit(exitCode);
-    },
-  },
-  {
-    id: "attach",
-    label: "Attach to new Cmux layout",
-    group: "interact",
-    isAvailable: ({ ws }) => isRunning(ws),
-    async run({ ws }) {
-      await runAttach({ ws });
     },
   },
 
@@ -194,6 +185,15 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
   },
 
   // ── Layout (Cmux) ──
+  {
+    id: "attach",
+    label: "Attach layout",
+    group: "layout",
+    isAvailable: ({ ws }) => isRunning(ws),
+    async run({ ws }) {
+      await runAttach({ ws });
+    },
+  },
   {
     id: "activate",
     label: "Activate layout",
