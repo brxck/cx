@@ -24,7 +24,7 @@ import { serveCommand } from "./commands/serve.ts";
 const commandGroups = [
   {
     label: "Lifecycle",
-    commands: ["up", "down", "attach", "detach"],
+    commands: ["up", "down", "attach", "detach", "restart", "update"],
   },
   {
     label: "Navigation",
@@ -32,7 +32,7 @@ const commandGroups = [
   },
   {
     label: "Workspace",
-    commands: ["list", "ssh", "ports", "exec", "open", "logs", "update", "restart"],
+    commands: ["list", "ssh", "ports", "exec", "open", "logs"],
   },
   {
     label: "Configuration",
