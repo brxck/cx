@@ -19,6 +19,10 @@ Read these before making changes.
 - **State**: bun:sqlite at `~/.cx/state.db`
 - **Build**: `bun build --compile` for standalone binaries
 
+## User config
+
+- Personal configurations live at `~/.config/cx`
+
 ## Project layout
 
 - `src/cli.ts` — main entry, defines root command and subcommands
@@ -36,6 +40,8 @@ Read these before making changes.
 - `bun run dev` — run CLI in dev mode
 - `bun run build` — compile standalone binary to `dist/`
 - `bun run typecheck` — type-check without emitting
+
+Run `bun run build` after finishing a change to confirm it compiles.
 
 ## Terminology
 

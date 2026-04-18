@@ -5,16 +5,65 @@ import pc from "picocolors";
 import {
   listWorkspaces,
   getCoderUrl,
+  dashboardUrl,
   workspaceStatus,
   requireCoderLogin,
   type CoderWorkspace,
 } from "../lib/coder.ts";
+import { listWorkspaces as listCmuxWorkspaces } from "../lib/cmux.ts";
 import { formatWorkspaceLabel, fuzzyMatch } from "../lib/workspace-picker.ts";
-import { getLayoutsByCoderWorkspace } from "../lib/store.ts";
+import { getLayoutsByCoderWorkspace, type LayoutEntry } from "../lib/store.ts";
 import {
   WORKSPACE_ACTIONS,
   buildActionOptions,
 } from "../lib/workspace-actions.ts";
+
+const FIELD_WIDTH = 10;
+
+function field(label: string): string {
+  return pc.dim(label.padEnd(FIELD_WIDTH));
+}
+
+async function printWorkspaceSummary(
+  ws: CoderWorkspace,
+  layouts: LayoutEntry[],
+  coderBaseUrl: string,
+): Promise<void> {
+  const lines: string[] = [];
+  lines.push(formatWorkspaceLabel(ws));
+  lines.push(field("Dashboard") + pc.dim(dashboardUrl(coderBaseUrl, ws.owner_name, ws.name)));
+
+  if (ws.outdated) {
+    lines.push(field("Template") + pc.yellow("⚠ outdated"));
+  }
+
+  if (layouts.length > 0) {
+    let activeRefs: Set<string> | null = null;
+    try {
+      const cmuxWs = await listCmuxWorkspaces();
+      activeRefs = new Set(cmuxWs.map((w) => w.ref));
+    } catch {}
+    const parts = layouts.map((l) => {
+      if (!activeRefs) return l.name;
+      return activeRefs.has(l.cmux_id) ? `${pc.green("●")} ${l.name}` : `${pc.dim("○ " + l.name)}`;
+    });
+    lines.push(field("Layouts") + parts.join("  "));
+  }
+
+  const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
+  if (agents.length > 0) {
+    const parts = agents.map((a) => {
+      const ready = a.status === "connected" && a.lifecycle_state === "ready";
+      const state = ready ? pc.green("ready") : pc.yellow(a.lifecycle_state);
+      return `${a.name} ${pc.dim("(" + a.status + ", ")}${state}${pc.dim(")")}`;
+    });
+    lines.push(field("Agents") + parts.join("  "));
+  }
+
+  consola.log("");
+  for (const line of lines) consola.log(line);
+  consola.log("");
+}
 
 export const listCommand = defineCommand({
   meta: {
@@ -107,6 +156,8 @@ export const listCommand = defineCommand({
     const available = WORKSPACE_ACTIONS.filter((a) => a.isAvailable({ ws, layouts }));
     const ctx = { ws, layouts, coderBaseUrl };
     const options = buildActionOptions(available, ctx);
+
+    await printWorkspaceSummary(ws, layouts, coderBaseUrl);
 
     const choice = await p.autocomplete({
       message: `Action for ${pc.bold(ws.name)}`,
