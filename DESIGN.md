@@ -23,9 +23,7 @@ cx
 └── coder                    # Coder workspace utilities
     ├── list                 # list workspaces (enhanced)
     ├── ssh [workspace]      # SSH with session management
-    ├── ports [workspace]    # port forwarding with presets
-    ├── forward [layout]     # start port forwarding from template
-    ├── unforward [layout]   # stop port forwarding
+    ├── ports [workspace]    # manage port forwarding (interactive + flags)
     ├── exec <workspace> <cmd> # run one-off command on workspace
     ├── open [workspace]     # open dashboard or IDE
     └── logs [workspace]     # stream workspace agent logs
@@ -96,7 +94,14 @@ SSH into a workspace with ZMX session management. Existing implementation with s
 
 #### `coder ports [workspace]`
 
-Port forwarding with preset mappings and interactive selection. Existing implementation.
+Manage port forwarding for a Coder workspace. Resolves workspace first (since forwards are global, not tied to a layout or cwd), then either runs non-interactively from flags or drops into an interactive menu that shows active forwards and lets you start/stop in one flow.
+
+- `--tcp <mapping>` — start TCP forward(s), comma-separated (e.g. `8080:8080,3000:3000`)
+- `--udp <mapping>` — start UDP forward(s)
+- `--stop` — stop all active forwards for the workspace
+- `--template` — start forwards defined in the workspace's layout template
+
+Interactive mode shows currently running forwards, presets (annotated "forwarded" or "in use"), a "Start template ports" action when the workspace has a layout with template ports, a "Stop all active forwards" action when any are running, and a custom mapping prompt. All forwards run as detached `coder port-forward` processes.
 
 #### `coder exec <workspace> <cmd>`
 
@@ -343,13 +348,16 @@ Implementation: `src/lib/store.ts`
 
 ### Manual Port Forwarding
 
-Port forwarding is manually controlled:
+Port forwarding is managed through a single command, `cx ports [workspace]`:
 
-- `cx forward [layout]` — start forwarding ports defined in the layout's template
-- `cx unforward [layout]` — stop forwarding for a layout/workspace
-- `cx ports [workspace]` — interactive ad-hoc port picker (existing)
+- Interactive mode lists active forwards, presets, template ports, and a custom input in one multiselect.
+- `--tcp` / `--udp` start specific mappings non-interactively.
+- `--template` starts the workspace's layout-template ports.
+- `--stop` stops all active forwards for the workspace.
 
-`cx up` starts port forwarding automatically (unless `--no-ports`). `cx down` does not stop it — use `cx unforward` explicitly.
+Workspace-first resolution: forwards are global (not tied to cwd or a specific layout), so the picker lists Coder workspaces. When the selected workspace has a layout with template ports, they're offered as a "Start template ports" action.
+
+`cx up` starts port forwarding automatically (unless `--no-ports`). `cx down` does not stop it — use `cx ports --stop` explicitly.
 
 ### Layout State Persistence
 

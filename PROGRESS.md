@@ -11,9 +11,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `status` | Done | Rich dashboard joining store, Coder, Cmux, sidebar state, and port-forward processes. Per-layout boxes with Coder status, Cmux state (headless shown as `⊘ headless`), git branch/dirty, path, template, ports, sessions, Claude status, PR info. Untracked workspaces table. Summary line. `--json` and `--layout` flags. |
 | `list` | Done | Interactive workspace picker with fuzzy filter, SSH and dashboard actions |
 | `ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
-| `ports [workspace]` | Done | Preset port mappings, interactive multi-select, custom mappings |
-| `forward [layout]` | Done | Start port forwarding from layout template config. Resolves by name, cwd, or picker. Detects already-forwarded ports. |
-| `unforward [layout]` | Done | Stop port forwarding by killing `coder port-forward` process. Resolves by layout name, workspace name, cwd, or picker. |
+| `ports [workspace]` | Done | Unified port-forward management. Workspace-first resolution. Interactive multi-select shows active forwards, presets (annotated `forwarded`/`in use`), template ports as a "Start template ports" action, "Stop all active forwards" action, and a custom mapping prompt. Flags: `--tcp`, `--udp`, `--stop`, `--template` for non-interactive use. All forwards run detached. |
 | `exec <workspace> <cmd>` | Done | Runs command via SSH with `--` separator, checks workspace is running |
 | `open [workspace]` | Done | Dynamically lists all workspace apps (Dashboard, VS Code if enabled, plus custom apps from agent config). Interactive picker or `-t` flag. Dashboard and VS Code special-cased; all others delegate to `coder open app`. |
 | `logs [workspace]` | Done | Streams agent logs with `--follow` (default) and `--build` number |
@@ -44,7 +42,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | ZMX session tracking | Done | All terminal surfaces get named ZMX sessions, recorded in store, reconnectable across layout rebuilds |
 | Config file | Done | `~/.config/cx/config.json` stores `username` and optional `agent` (default `"main"`). Required for SSH host construction. |
 | Centralized SSH host builder | Done | `src/lib/ssh.ts` — `sshHost()` builds `{agent}.{workspace}.{username}.coder`, `sshHostWithSession()` appends `.{session}`. All callsites migrated from old `coder.{workspace}` format. |
-| Manual port forward control | Done | `forward`/`unforward` commands replace auto port forwarding design |
+| Manual port forward control | Done | Unified `cx ports` command handles start/stop/template/ad-hoc in a single interactive + flag-driven UI, replacing separate `forward`/`unforward` commands |
 | Git branch awareness | Done | Live sidebar data persisted to DB opportunistically by `status`, `activate`, and `find --branch`. Enables offline branch search. |
 | Health monitoring | Not started | |
 

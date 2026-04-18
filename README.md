@@ -41,7 +41,7 @@ cx
 ├── restore             Restore layouts after a restart
 ├── list                List Coder workspaces
 ├── ssh [workspace]     SSH into a workspace with session management
-├── ports [workspace]   Forward ports from a workspace
+├── ports [workspace]   Manage port forwarding (interactive + flags)
 ├── exec <ws> <cmd>     Run a command on a workspace via SSH
 ├── open [workspace]    Open a workspace app (dashboard, VS Code, etc.)
 ├── logs [workspace]    Stream workspace agent logs
