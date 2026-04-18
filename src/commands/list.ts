@@ -78,7 +78,7 @@ export const listCommand = defineCommand({
     },
     interactive: {
       type: "boolean",
-      description: "Enable interactive selection (default: true)",
+      description: "Enable interactive selection",
       default: true,
     },
   },

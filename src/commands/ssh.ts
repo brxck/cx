@@ -74,13 +74,13 @@ export const sshCommand = defineCommand({
   args: {
     workspace: {
       type: "positional",
-      description: "Workspace name (fuzzy matched, or pick interactively)",
+      description: "Workspace name",
       required: false,
     },
     session: {
       type: "string",
       alias: "s",
-      description: "ZMX session name (appended as .<session> to the host)",
+      description: "ZMX session name",
       required: false,
     },
     "no-session": {

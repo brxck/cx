@@ -236,7 +236,7 @@ export const portForwardCommand = defineCommand({
   args: {
     workspace: {
       type: "positional",
-      description: "Workspace name (fuzzy matched, or pick interactively)",
+      description: "Workspace name",
       required: false,
     },
     tcp: {

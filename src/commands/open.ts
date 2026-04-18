@@ -207,30 +207,28 @@ export async function runOpen(opts: RunOpenOpts): Promise<void> {
 export const openCommand = defineCommand({
   meta: {
     name: "open",
-    description:
-      "Open a workspace app (dashboard, VS Code, or any app) in the default browser or a cmux browser surface",
+    description: "Open a workspace app in the browser or a cmux surface",
   },
   args: {
     workspace: {
       type: "positional",
-      description: "Workspace name (fuzzy matched, or pick interactively)",
+      description: "Workspace name",
       required: false,
     },
     target: {
       type: "string",
       alias: "t",
-      description: "App to open (e.g. dashboard, vscode, or any app slug)",
+      description: "App slug (e.g. dashboard, vscode)",
       required: false,
     },
     in: {
       type: "string",
-      description: "Where to open: 'default' (OS browser) or 'cmux' (cmux browser surface)",
+      description: "Where to open: default or cmux",
       required: false,
     },
     split: {
       type: "string",
-      description:
-        "Before opening in cmux, split the pane: left, right, up, or down (requires --in cmux)",
+      description: "Split pane before opening: left, right, up, down (requires --in cmux)",
       required: false,
     },
   },

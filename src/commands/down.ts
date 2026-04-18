@@ -54,12 +54,12 @@ export const downCommand = defineCommand({
     },
     stop: {
       type: "boolean",
-      description: "Also stop the Coder workspace (skip confirmation)",
+      description: "Also stop the Coder workspace",
       default: false,
     },
     keep: {
       type: "boolean",
-      description: "Only remove the layout, keep Coder workspace running (skip confirmation)",
+      description: "Keep the Coder workspace running",
       default: false,
     },
   },
