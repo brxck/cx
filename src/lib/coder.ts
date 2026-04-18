@@ -28,6 +28,8 @@ export interface CoderWorkspace {
           hidden?: boolean;
           subdomain?: boolean;
           subdomain_name?: string;
+          external?: boolean;
+          command?: string;
         }>;
       }>;
     }>;
