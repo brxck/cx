@@ -5,6 +5,36 @@ import * as cmux from "../lib/cmux.ts";
 import { getAllLayouts, getLayout, touchLayout, updateLayout, type LayoutEntry } from "../lib/store.ts";
 import { fuzzyMatch, pickLayout } from "../lib/workspace-picker.ts";
 
+export interface RunActivateOpts {
+  layout: LayoutEntry;
+}
+
+export async function runActivate(opts: RunActivateOpts): Promise<void> {
+  const { layout } = opts;
+
+  try {
+    await cmux.selectWorkspace(layout.cmux_id);
+  } catch {
+    consola.error(
+      `Layout ${pc.bold(layout.name)} is not active in Cmux. Use ${pc.cyan("up")} to recreate it.`,
+    );
+    process.exit(1);
+  }
+
+  touchLayout(layout.name);
+
+  // Opportunistically persist branch from sidebar
+  try {
+    const output = await cmux.sidebarState(layout.cmux_id);
+    const sidebar = cmux.parseSidebarState(output);
+    if (sidebar.gitBranch) {
+      updateLayout(layout.name, { branch: sidebar.gitBranch });
+    }
+  } catch {}
+
+  consola.success(`Switched to ${pc.bold(layout.name)}`);
+}
+
 export const activateCommand = defineCommand({
   meta: {
     name: "activate",
@@ -21,27 +51,7 @@ export const activateCommand = defineCommand({
     const layout = await resolveLayout(args.layout as string | undefined);
     if (!layout) return;
 
-    try {
-      await cmux.selectWorkspace(layout.cmux_id);
-    } catch {
-      consola.error(
-        `Layout ${pc.bold(layout.name)} is not active in Cmux. Use ${pc.cyan("up")} to recreate it.`,
-      );
-      process.exit(1);
-    }
-
-    touchLayout(layout.name);
-
-    // Opportunistically persist branch from sidebar
-    try {
-      const output = await cmux.sidebarState(layout.cmux_id);
-      const sidebar = cmux.parseSidebarState(output);
-      if (sidebar.gitBranch) {
-        updateLayout(layout.name, { branch: sidebar.gitBranch });
-      }
-    } catch {}
-
-    consola.success(`Switched to ${pc.bold(layout.name)}`);
+    await runActivate({ layout });
   },
 });
 

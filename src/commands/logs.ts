@@ -1,8 +1,27 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import pc from "picocolors";
-import { streamLogs, requireCoderLogin } from "../lib/coder.ts";
+import {
+  streamLogs,
+  requireCoderLogin,
+  type CoderWorkspace,
+} from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
+
+export interface RunLogsOpts {
+  ws: CoderWorkspace;
+  follow?: boolean;
+  build?: number;
+}
+
+export async function runLogs(opts: RunLogsOpts): Promise<number> {
+  const { ws } = opts;
+  consola.info(`Streaming logs for ${pc.bold(ws.name)}...`);
+  return streamLogs(ws.name, {
+    follow: opts.follow,
+    build: opts.build,
+  });
+}
 
 export const logsCommand = defineCommand({
   meta: {
@@ -45,8 +64,8 @@ export const logsCommand = defineCommand({
       process.exit(1);
     }
 
-    consola.info(`Streaming logs for ${pc.bold(ws.name)}...`);
-    const exitCode = await streamLogs(ws.name, {
+    const exitCode = await runLogs({
+      ws,
       follow: args.follow as boolean,
       build: args.build ? Number(args.build) : undefined,
     });

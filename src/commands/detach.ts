@@ -5,6 +5,29 @@ import * as cmux from "../lib/cmux.ts";
 import { getLayout, getLayoutsByPath, getAllLayouts, removeLayout, type LayoutEntry } from "../lib/store.ts";
 import { pickLayout } from "../lib/workspace-picker.ts";
 
+export interface RunDetachOpts {
+  layout: LayoutEntry;
+}
+
+export async function runDetach(opts: RunDetachOpts): Promise<void> {
+  const { layout } = opts;
+
+  p.intro(pc.bold(`cx detach ${pc.cyan(layout.name)}`));
+
+  try {
+    await cmux.closeWorkspace(layout.cmux_id);
+    p.log.success("Cmux workspace closed");
+  } catch {
+    p.log.info("Cmux workspace already closed");
+  }
+
+  removeLayout(layout.name);
+
+  p.outro(
+    `${pc.green("✓")} Layout ${pc.bold(layout.name)} detached — workspace ${pc.cyan(layout.coder_ws)} is still running`,
+  );
+}
+
 export const detachCommand = defineCommand({
   meta: {
     name: "detach",
@@ -18,26 +41,10 @@ export const detachCommand = defineCommand({
     },
   },
   async run({ args }) {
-    // 1. Resolve layout
     const layout = await resolveLayout(args.layout as string | undefined);
     if (!layout) return;
 
-    p.intro(pc.bold(`cx detach ${pc.cyan(layout.name)}`));
-
-    // 2. Close Cmux workspace
-    try {
-      await cmux.closeWorkspace(layout.cmux_id);
-      p.log.success("Cmux workspace closed");
-    } catch {
-      p.log.info("Cmux workspace already closed");
-    }
-
-    // 3. Remove from store
-    removeLayout(layout.name);
-
-    p.outro(
-      `${pc.green("✓")} Layout ${pc.bold(layout.name)} detached — workspace ${pc.cyan(layout.coder_ws)} is still running`,
-    );
+    await runDetach({ layout });
   },
 });
 

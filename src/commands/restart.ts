@@ -7,7 +7,19 @@ import {
   listWorkspaces,
   workspaceStatus,
   restartWorkspace,
+  type CoderWorkspace,
 } from "../lib/coder.ts";
+
+export interface RunRestartOpts {
+  ws: CoderWorkspace;
+}
+
+export async function runRestart(opts: RunRestartOpts): Promise<void> {
+  const { ws } = opts;
+  consola.start(`Restarting ${pc.cyan(ws.name)}...`);
+  await restartWorkspace(ws.name);
+  consola.success(`${pc.cyan(ws.name)} restarted`);
+}
 
 export const restartCommand = defineCommand({
   meta: {
@@ -50,8 +62,6 @@ export const restartCommand = defineCommand({
       process.exit(1);
     }
 
-    consola.start(`Restarting ${pc.cyan(wsName)}...`);
-    await restartWorkspace(wsName);
-    consola.success(`${pc.cyan(wsName)} restarted`);
+    await runRestart({ ws });
   },
 });

@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { requireCoderLogin } from "../lib/coder.ts";
+import { requireCoderLogin, type CoderWorkspace } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 import { getLayoutsByCoderWorkspace } from "../lib/store.ts";
 import { getTemplate } from "../lib/templates.ts";
@@ -82,6 +82,152 @@ function startUdpForwarding(coderWsName: string, mappings: string[]): void {
   consola.info(`UDP port forwarding started: ${pc.dim(mappings.join(", "))} (pid ${proc.pid})`);
 }
 
+export interface RunPortsOpts {
+  ws: CoderWorkspace;
+  tcp?: string[];
+  udp?: string[];
+  stop?: boolean;
+  template?: boolean;
+}
+
+export async function runPorts(opts: RunPortsOpts): Promise<void> {
+  const { ws } = opts;
+  const tcpFlag = opts.tcp ?? [];
+  const udpFlag = opts.udp ?? [];
+  const wantStop = Boolean(opts.stop);
+  const wantTemplate = Boolean(opts.template);
+  const nonInteractive = tcpFlag.length > 0 || udpFlag.length > 0 || wantStop || wantTemplate;
+
+  if (nonInteractive) {
+    if (wantStop) {
+      const killed = await stopPortForwards(ws.name);
+      if (killed > 0) {
+        consola.success(`Stopped port forwarding for ${pc.bold(ws.name)}`);
+      } else {
+        consola.warn(`No port forwards found for ${ws.name}`);
+      }
+    }
+    if (wantTemplate) {
+      const ports = await getTemplatePortsForWorkspace(ws.name);
+      if (!ports) {
+        consola.warn(`No template ports configured for ${pc.bold(ws.name)}`);
+      } else {
+        startPortForwarding(ws.name, ports);
+      }
+    }
+    if (tcpFlag.length > 0) startPortForwarding(ws.name, tcpFlag);
+    if (udpFlag.length > 0) startUdpForwarding(ws.name, udpFlag);
+    return;
+  }
+
+  // Interactive mode
+  const running = await detectPortForwards();
+  const active = running.filter((r) => r.workspace === ws.name);
+  const activePorts = new Set(active.flatMap((r) => r.ports));
+
+  if (activePorts.size > 0) {
+    consola.info(
+      `Active forwards on ${pc.bold(ws.name)}: ${pc.dim([...activePorts].join(", "))}`,
+    );
+  }
+
+  const templatePorts = await getTemplatePortsForWorkspace(ws.name);
+  const pendingTemplate = templatePorts?.filter((p) => !activePorts.has(p)) ?? [];
+
+  const CUSTOM_VALUE = "__custom__";
+  const STOP_VALUE = "__stop__";
+  const TEMPLATE_VALUE = "__template__";
+
+  const portStatus = await Promise.all(
+    PORT_PRESETS.map(async (preset) => ({
+      ...preset,
+      inUseLocally: await isPortInUse(preset.local),
+      forwarded: activePorts.has(preset.tcp),
+    })),
+  );
+
+  const options: Array<{ value: string; label: string }> = [];
+  if (activePorts.size > 0) {
+    options.push({
+      value: STOP_VALUE,
+      label: pc.red(`Stop all active forwards (${[...activePorts].join(", ")})`),
+    });
+  }
+  if (pendingTemplate.length > 0) {
+    options.push({
+      value: TEMPLATE_VALUE,
+      label: `${pc.cyan("Start template ports")} ${pc.dim(pendingTemplate.join(", "))}`,
+    });
+  }
+  options.push({
+    value: CUSTOM_VALUE,
+    label: pc.italic("Custom port mapping(s)"),
+  });
+  for (const preset of portStatus) {
+    options.push({
+      value: preset.tcp,
+      label: formatPresetLabel(preset, preset.inUseLocally, preset.forwarded),
+    });
+  }
+
+  const selected = await p.multiselect({
+    message: `Select port(s) to forward ${pc.dim("(local ← remote)")}`,
+    options,
+    required: true,
+  });
+
+  if (p.isCancel(selected)) {
+    p.cancel("Cancelled.");
+    process.exit(0);
+  }
+
+  const tcpMappings: string[] = [];
+
+  if (selected.includes(STOP_VALUE)) {
+    const killed = await stopPortForwards(ws.name);
+    if (killed > 0) {
+      consola.success(`Stopped port forwarding for ${pc.bold(ws.name)}`);
+    }
+  }
+
+  if (selected.includes(TEMPLATE_VALUE) && pendingTemplate.length > 0) {
+    tcpMappings.push(...pendingTemplate);
+  }
+
+  for (const value of selected) {
+    if (value === STOP_VALUE || value === TEMPLATE_VALUE || value === CUSTOM_VALUE) continue;
+    if (activePorts.has(value)) continue; // already forwarded; skip duplicate
+    tcpMappings.push(value);
+  }
+
+  if (selected.includes(CUSTOM_VALUE)) {
+    const input = await p.text({
+      message: "Enter TCP port mapping(s)",
+      placeholder: "8080:8080, 3000:3000",
+      validate: (value = "") => {
+        if (!value.trim()) return "At least one port mapping is required";
+        const parts = value.split(",").map((s) => s.trim());
+        for (const part of parts) {
+          if (!/^\d+([:\-]\d+)*$/.test(part)) {
+            return `Invalid mapping: ${part}`;
+          }
+        }
+      },
+    });
+
+    if (p.isCancel(input)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+
+    tcpMappings.push(...parseMappings(input));
+  }
+
+  if (tcpMappings.length > 0) {
+    startPortForwarding(ws.name, tcpMappings);
+  }
+}
+
 export const portForwardCommand = defineCommand({
   meta: {
     name: "ports",
@@ -127,139 +273,12 @@ export const portForwardCommand = defineCommand({
       process.exit(1);
     }
 
-    const tcpFlag = parseMappings(args.tcp as string | undefined);
-    const udpFlag = parseMappings(args.udp as string | undefined);
-    const wantStop = Boolean(args.stop);
-    const wantTemplate = Boolean(args.template);
-    const nonInteractive = tcpFlag.length > 0 || udpFlag.length > 0 || wantStop || wantTemplate;
-
-    if (nonInteractive) {
-      if (wantStop) {
-        const killed = await stopPortForwards(ws.name);
-        if (killed > 0) {
-          consola.success(`Stopped port forwarding for ${pc.bold(ws.name)}`);
-        } else {
-          consola.warn(`No port forwards found for ${ws.name}`);
-        }
-      }
-      if (wantTemplate) {
-        const ports = await getTemplatePortsForWorkspace(ws.name);
-        if (!ports) {
-          consola.warn(`No template ports configured for ${pc.bold(ws.name)}`);
-        } else {
-          startPortForwarding(ws.name, ports);
-        }
-      }
-      if (tcpFlag.length > 0) startPortForwarding(ws.name, tcpFlag);
-      if (udpFlag.length > 0) startUdpForwarding(ws.name, udpFlag);
-      return;
-    }
-
-    // Interactive mode
-    const running = await detectPortForwards();
-    const active = running.filter((r) => r.workspace === ws.name);
-    const activePorts = new Set(active.flatMap((r) => r.ports));
-
-    if (activePorts.size > 0) {
-      consola.info(
-        `Active forwards on ${pc.bold(ws.name)}: ${pc.dim([...activePorts].join(", "))}`,
-      );
-    }
-
-    const templatePorts = await getTemplatePortsForWorkspace(ws.name);
-    const pendingTemplate = templatePorts?.filter((p) => !activePorts.has(p)) ?? [];
-
-    const CUSTOM_VALUE = "__custom__";
-    const STOP_VALUE = "__stop__";
-    const TEMPLATE_VALUE = "__template__";
-
-    const portStatus = await Promise.all(
-      PORT_PRESETS.map(async (preset) => ({
-        ...preset,
-        inUseLocally: await isPortInUse(preset.local),
-        forwarded: activePorts.has(preset.tcp),
-      })),
-    );
-
-    const options: Array<{ value: string; label: string }> = [];
-    if (activePorts.size > 0) {
-      options.push({
-        value: STOP_VALUE,
-        label: pc.red(`Stop all active forwards (${[...activePorts].join(", ")})`),
-      });
-    }
-    if (pendingTemplate.length > 0) {
-      options.push({
-        value: TEMPLATE_VALUE,
-        label: `${pc.cyan("Start template ports")} ${pc.dim(pendingTemplate.join(", "))}`,
-      });
-    }
-    options.push({
-      value: CUSTOM_VALUE,
-      label: pc.italic("Custom port mapping(s)"),
+    await runPorts({
+      ws,
+      tcp: parseMappings(args.tcp as string | undefined),
+      udp: parseMappings(args.udp as string | undefined),
+      stop: Boolean(args.stop),
+      template: Boolean(args.template),
     });
-    for (const preset of portStatus) {
-      options.push({
-        value: preset.tcp,
-        label: formatPresetLabel(preset, preset.inUseLocally, preset.forwarded),
-      });
-    }
-
-    const selected = await p.multiselect({
-      message: `Select port(s) to forward ${pc.dim("(local ← remote)")}`,
-      options,
-      required: true,
-    });
-
-    if (p.isCancel(selected)) {
-      p.cancel("Cancelled.");
-      process.exit(0);
-    }
-
-    const tcpMappings: string[] = [];
-
-    if (selected.includes(STOP_VALUE)) {
-      const killed = await stopPortForwards(ws.name);
-      if (killed > 0) {
-        consola.success(`Stopped port forwarding for ${pc.bold(ws.name)}`);
-      }
-    }
-
-    if (selected.includes(TEMPLATE_VALUE) && pendingTemplate.length > 0) {
-      tcpMappings.push(...pendingTemplate);
-    }
-
-    for (const value of selected) {
-      if (value === STOP_VALUE || value === TEMPLATE_VALUE || value === CUSTOM_VALUE) continue;
-      if (activePorts.has(value)) continue; // already forwarded; skip duplicate
-      tcpMappings.push(value);
-    }
-
-    if (selected.includes(CUSTOM_VALUE)) {
-      const input = await p.text({
-        message: "Enter TCP port mapping(s)",
-        placeholder: "8080:8080, 3000:3000",
-        validate: (value = "") => {
-          if (!value.trim()) return "At least one port mapping is required";
-          const parts = value.split(",").map((s) => s.trim());
-          for (const part of parts) {
-            if (!/^\d+([:\-]\d+)*$/.test(part)) {
-              return `Invalid mapping: ${part}`;
-            }
-          }
-        },
-      });
-
-      if (p.isCancel(input)) {
-        p.cancel("Cancelled.");
-        process.exit(0);
-      }
-
-      tcpMappings.push(...parseMappings(input));
-    }
-
-    if (tcpMappings.length > 0) {
-      startPortForwarding(ws.name, tcpMappings);
-    }
   },
 });

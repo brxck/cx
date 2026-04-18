@@ -5,14 +5,17 @@ import pc from "picocolors";
 import {
   listWorkspaces,
   getCoderUrl,
-  dashboardUrl,
   workspaceStatus,
-  openInBrowser,
-  sshIntoWorkspace,
   requireCoderLogin,
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import { formatWorkspaceLabel, fuzzyMatch } from "../lib/workspace-picker.ts";
+import { getLayoutsByCoderWorkspace } from "../lib/store.ts";
+import {
+  WORKSPACE_ACTIONS,
+  buildActionOptions,
+  isGroupSeparator,
+} from "../lib/workspace-actions.ts";
 
 export const listCommand = defineCommand({
   meta: {
@@ -101,36 +104,33 @@ export const listCommand = defineCommand({
     }
 
     const ws = filtered.find((w) => w.name === selected)!;
+    const layouts = getLayoutsByCoderWorkspace(ws.name);
+    const available = WORKSPACE_ACTIONS.filter((a) => a.isAvailable({ ws, layouts }));
+    const ctx = { ws, layouts, coderBaseUrl };
+    const options = buildActionOptions(available, ctx);
 
-    const action = await p.select({
-      message: `Action for ${pc.bold(ws.name)}`,
-      options: [
-        { value: "ssh", label: "SSH into workspace" },
-        {
-          value: "dashboard",
-          label: "Open in Coder dashboard",
-          hint: dashboardUrl(coderBaseUrl, ws.owner_name, ws.name),
-        },
-      ],
-    });
+    while (true) {
+      const choice = await p.select({
+        message: `Action for ${pc.bold(ws.name)}`,
+        options,
+      });
 
-    if (p.isCancel(action)) {
-      p.cancel("Cancelled.");
-      process.exit(0);
-    }
-
-    switch (action) {
-      case "dashboard": {
-        const url = dashboardUrl(coderBaseUrl, ws.owner_name, ws.name);
-        consola.info(`Opening ${pc.underline(url)}`);
-        await openInBrowser(url);
-        break;
+      if (p.isCancel(choice)) {
+        p.cancel("Cancelled.");
+        process.exit(0);
       }
-      case "ssh": {
-        consola.info(`Connecting to ${pc.bold(ws.name)} via SSH...`);
-        await sshIntoWorkspace(ws.name);
-        break;
+
+      if (isGroupSeparator(choice as string)) {
+        continue;
       }
+
+      const action = available.find((a) => a.id === choice);
+      if (!action) {
+        consola.error(`Unknown action: ${choice}`);
+        process.exit(1);
+      }
+      await action.run(ctx);
+      break;
     }
   },
 });

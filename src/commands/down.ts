@@ -6,6 +6,41 @@ import * as cmux from "../lib/cmux.ts";
 import { getAllLayouts, getLayout, getLayoutsByPath, removeLayout, type LayoutEntry } from "../lib/store.ts";
 import { pickLayout } from "../lib/workspace-picker.ts";
 
+export interface RunDownOpts {
+  layout: LayoutEntry;
+  stop?: boolean;
+  keep?: boolean;
+}
+
+export async function runDown(opts: RunDownOpts): Promise<void> {
+  const { layout } = opts;
+
+  p.intro(pc.bold(`cx down ${pc.cyan(layout.name)}`));
+
+  const shouldStop = await resolveShouldStop(
+    layout,
+    opts.stop ?? false,
+    opts.keep ?? false,
+  );
+
+  try {
+    await cmux.closeWorkspace(layout.cmux_id);
+    p.log.success("Cmux workspace closed");
+  } catch {
+    p.log.info("Cmux workspace already closed");
+  }
+
+  if (shouldStop) {
+    p.log.step(`Stopping workspace ${pc.bold(layout.coder_ws)}`);
+    await stopWorkspace(layout.coder_ws);
+    p.log.success(`Workspace ${pc.bold(layout.coder_ws)} stopped`);
+  }
+
+  removeLayout(layout.name);
+
+  p.outro(`${pc.green("✓")} Layout ${pc.bold(layout.name)} torn down`);
+}
+
 export const downCommand = defineCommand({
   meta: {
     name: "down",
@@ -31,38 +66,14 @@ export const downCommand = defineCommand({
   async run({ args }) {
     await requireCoderLogin();
 
-    // 1. Resolve layout
     const layout = await resolveLayout(args.layout as string | undefined);
     if (!layout) return;
 
-    p.intro(pc.bold(`cx down ${pc.cyan(layout.name)}`));
-
-    // 2. Determine whether to stop the Coder workspace
-    const shouldStop = await resolveShouldStop(
+    await runDown({
       layout,
-      args.stop as boolean,
-      args.keep as boolean,
-    );
-
-    // 3. Close Cmux workspace
-    try {
-      await cmux.closeWorkspace(layout.cmux_id);
-      p.log.success("Cmux workspace closed");
-    } catch {
-      p.log.info("Cmux workspace already closed");
-    }
-
-    // 4. Stop Coder workspace if requested
-    if (shouldStop) {
-      p.log.step(`Stopping workspace ${pc.bold(layout.coder_ws)}`);
-      await stopWorkspace(layout.coder_ws);
-      p.log.success(`Workspace ${pc.bold(layout.coder_ws)} stopped`);
-    }
-
-    // 5. Remove from store
-    removeLayout(layout.name);
-
-    p.outro(`${pc.green("✓")} Layout ${pc.bold(layout.name)} torn down`);
+      stop: args.stop as boolean,
+      keep: args.keep as boolean,
+    });
   },
 });
 
