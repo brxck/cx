@@ -44,8 +44,15 @@ export async function buildCmuxLayout(
     await cmux.setWorkspaceColor(wsRef, template.color);
   }
 
+  // Resolve the initial SSH surface (the single surface of the single pane).
+  const panes = await cmux.listPanes(wsRef);
+  const initialSurfRef = panes[0]?.surface_refs[0];
+  if (!initialSurfRef) {
+    throw new Error(`New SSH workspace ${wsRef} has no initial surface`);
+  }
+
   const sessions: Array<{ name: string; command?: string }> = [];
-  await walkLayout(template.layout, wsRef, coderWsName, undefined, sessions);
+  await walkLayout(template.layout, wsRef, coderWsName, initialSurfRef, sessions);
 
   spinner.stop(`Layout built — ${pc.cyan(wsRef)}`);
   return { cmuxRef: wsRef, sessions };
@@ -135,7 +142,7 @@ async function walkLayout(
   node: LayoutNode,
   wsRef: string,
   coderWs: string,
-  surfRef: string | undefined,
+  surfRef: string,
   sessions: Array<{ name: string; command?: string }>,
 ): Promise<void> {
   if (isPaneNode(node)) {
@@ -144,11 +151,16 @@ async function walkLayout(
   }
 
   if (isSplitNode(node)) {
-    await walkLayout(node.children[0], wsRef, coderWs, surfRef, sessions);
-
+    // Split the anchor pane first so nested splits inherit the right geometry,
+    // instead of operating on whatever pane happens to be focused.
     const direction = node.direction === "horizontal" ? "right" : "down";
-    const newSurfRef = await cmux.newSplit({ workspace: wsRef, direction });
+    const newSurfRef = await cmux.newSplit({
+      workspace: wsRef,
+      surface: surfRef,
+      direction,
+    });
 
+    await walkLayout(node.children[0], wsRef, coderWs, surfRef, sessions);
     await walkLayout(node.children[1], wsRef, coderWs, newSurfRef, sessions);
   }
 }
@@ -156,10 +168,14 @@ async function walkLayout(
 async function configureSurfaces(
   node: PaneNode,
   wsRef: string,
-  surfRef: string | undefined,
+  surfRef: string,
   sessions: Array<{ name: string; command?: string }>,
 ): Promise<void> {
   const surfaces = node.pane.surfaces;
+
+  // newSurface (without --pane) targets the focused pane, so anchor focus here
+  // before iterating.
+  await cmux.focusSurface(wsRef, surfRef);
 
   for (let i = 0; i < surfaces.length; i++) {
     const surface = surfaces[i]!;
@@ -175,7 +191,7 @@ async function configureSurfaces(
 
       // Index 0 uses the surface from the split (or SSH workspace default).
       // Additional surfaces in the same pane need newSurface.
-      let targetSurf = surfRef;
+      let targetSurf: string = surfRef;
       if (i > 0) {
         targetSurf = await cmux.newSurface({
           workspace: wsRef,

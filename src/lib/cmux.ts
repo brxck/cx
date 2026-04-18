@@ -70,6 +70,26 @@ export async function tree(opts?: { workspace?: string; all?: boolean }): Promis
   return (await $`cmux tree ${args}`.quiet().text()).trim();
 }
 
+export interface CmuxPane {
+  ref: string;
+  surface_refs: string[];
+  focused: boolean;
+}
+
+/** List all panes in a workspace with their surface refs. */
+export async function listPanes(wsRef: string): Promise<CmuxPane[]> {
+  const params = JSON.stringify({ workspace_id: wsRef });
+  const out = await $`cmux rpc pane.list ${params}`.quiet().text();
+  const data = JSON.parse(out) as { panes: CmuxPane[] };
+  return data.panes;
+}
+
+/** Focus a specific surface. */
+export async function focusSurface(wsRef: string, surfRef: string): Promise<void> {
+  const params = JSON.stringify({ workspace_id: wsRef, surface_id: surfRef });
+  await $`cmux rpc surface.focus ${params}`.quiet();
+}
+
 // ── SSH workspaces ──
 
 export interface CmuxSshResult {
