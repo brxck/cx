@@ -41,13 +41,6 @@ export interface WorkspaceAction {
   run(ctx: ActionContext): Promise<void>;
 }
 
-const GROUP_LABELS: Record<ActionGroup, string> = {
-  navigation: "Open",
-  interact: "Interact",
-  lifecycle: "Lifecycle",
-  layout: "Layout",
-};
-
 export const GROUP_ORDER: ActionGroup[] = ["navigation", "interact", "lifecycle", "layout"];
 
 /** Pick one of the workspace's layouts, or return the single one if only one exists. */
@@ -242,37 +235,18 @@ interface SelectOption {
   hint?: string;
 }
 
-/** Build grouped select options with dimmed section headers between groups. */
+/** Build a flat list of action options, ordered by group but without visual headers. */
 export function buildActionOptions(
   actions: WorkspaceAction[],
   ctx: ActionContext,
 ): SelectOption[] {
-  const byGroup = new Map<ActionGroup, WorkspaceAction[]>();
-  for (const action of actions) {
-    const bucket = byGroup.get(action.group) ?? [];
-    bucket.push(action);
-    byGroup.set(action.group, bucket);
-  }
-
-  const options: SelectOption[] = [];
-  for (const group of GROUP_ORDER) {
-    const entries = byGroup.get(group);
-    if (!entries || entries.length === 0) continue;
-    options.push({
-      value: `__group:${group}`,
-      label: pc.dim(`── ${GROUP_LABELS[group]} ──`),
-    });
-    for (const action of entries) {
-      options.push({
-        value: action.id,
-        label: action.label,
-        hint: action.hint?.(ctx),
-      });
-    }
-  }
-  return options;
-}
-
-export function isGroupSeparator(value: string): boolean {
-  return value.startsWith("__group:");
+  const groupRank = new Map(GROUP_ORDER.map((g, i) => [g, i]));
+  const sorted = [...actions].sort(
+    (a, b) => (groupRank.get(a.group) ?? 0) - (groupRank.get(b.group) ?? 0),
+  );
+  return sorted.map((action) => ({
+    value: action.id,
+    label: action.label,
+    hint: action.hint?.(ctx),
+  }));
 }

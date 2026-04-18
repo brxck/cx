@@ -14,7 +14,6 @@ import { getLayoutsByCoderWorkspace } from "../lib/store.ts";
 import {
   WORKSPACE_ACTIONS,
   buildActionOptions,
-  isGroupSeparator,
 } from "../lib/workspace-actions.ts";
 
 export const listCommand = defineCommand({
@@ -109,28 +108,22 @@ export const listCommand = defineCommand({
     const ctx = { ws, layouts, coderBaseUrl };
     const options = buildActionOptions(available, ctx);
 
-    while (true) {
-      const choice = await p.select({
-        message: `Action for ${pc.bold(ws.name)}`,
-        options,
-      });
+    const choice = await p.autocomplete({
+      message: `Action for ${pc.bold(ws.name)}`,
+      options,
+      placeholder: "Type to filter",
+    });
 
-      if (p.isCancel(choice)) {
-        p.cancel("Cancelled.");
-        process.exit(0);
-      }
-
-      if (isGroupSeparator(choice as string)) {
-        continue;
-      }
-
-      const action = available.find((a) => a.id === choice);
-      if (!action) {
-        consola.error(`Unknown action: ${choice}`);
-        process.exit(1);
-      }
-      await action.run(ctx);
-      break;
+    if (p.isCancel(choice)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
     }
+
+    const action = available.find((a) => a.id === choice);
+    if (!action) {
+      consola.error(`Unknown action: ${choice}`);
+      process.exit(1);
+    }
+    await action.run(ctx);
   },
 });
