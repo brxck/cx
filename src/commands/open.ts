@@ -106,9 +106,10 @@ export async function runOpen(opts: RunOpenOpts): Promise<void> {
   if (opts.target) {
     app = resolveApp(tagged, opts.target);
   } else {
-    const choice = await p.select({
+    const choice = await p.autocomplete({
       message: `Open ${pc.bold(ws.name)}`,
       options: tagged.map((a) => ({ value: a.slug, label: a.label })),
+      placeholder: "Type to filter",
     });
     if (p.isCancel(choice)) process.exit(0);
     app = tagged.find((a) => a.slug === choice)!;
