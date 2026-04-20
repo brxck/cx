@@ -2,10 +2,16 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { requireCoderLogin, type CoderWorkspace } from "../lib/coder.ts";
+import {
+  requireCoderLogin,
+  buildWorkspaceContext,
+  getCoderUrl,
+  listWorkspaces as listCoderWorkspaces,
+  type CoderWorkspace,
+} from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 import { getLayoutsByCoderWorkspace } from "../lib/store.ts";
-import { getTemplate } from "../lib/templates.ts";
+import { getTemplateSource, materializeTemplate } from "../lib/templates.ts";
 import { detectPortForwards, stopPortForwards } from "../lib/ports.ts";
 import { startPortForwarding } from "../lib/layout-builder.ts";
 
@@ -63,8 +69,24 @@ async function getTemplatePortsForWorkspace(coderWs: string): Promise<string[] |
   const layouts = getLayoutsByCoderWorkspace(coderWs);
   for (const layout of layouts) {
     if (!layout.template) continue;
-    const template = await getTemplate(layout.template);
-    if (template?.ports?.length) return template.ports;
+    const source = await getTemplateSource(layout.template);
+    if (!source) continue;
+    const persistedVars = layout.vars
+      ? (JSON.parse(layout.vars) as Record<string, unknown>)
+      : undefined;
+    try {
+      const { template } = await materializeTemplate(source, {
+        persistedVars,
+        workspaceFactory: async () => {
+          const ws = (await listCoderWorkspaces()).find((w) => w.name === coderWs);
+          if (!ws) throw new Error(`Workspace "${coderWs}" not running`);
+          return buildWorkspaceContext(ws, await getCoderUrl());
+        },
+      });
+      if (template.ports?.length) return template.ports;
+    } catch {
+      continue;
+    }
   }
   return null;
 }

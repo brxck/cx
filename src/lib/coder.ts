@@ -251,6 +251,60 @@ export async function openInVSCode(workspaceName: string): Promise<void> {
   await $`coder open vscode ${workspaceName} --generate-token`.quiet();
 }
 
+export interface WorkspaceApp {
+  slug: string;
+  displayName: string;
+  subdomainName?: string;
+  url?: string;
+}
+
+export interface WorkspaceContext {
+  name: string;
+  templateName: string;
+  apps: WorkspaceApp[];
+  /** Absolute URL for a named app (subdomain preferred). Throws if missing. */
+  appUrl(slug: string): string;
+  raw: CoderWorkspace;
+}
+
+/** Build a WorkspaceContext view of a CoderWorkspace for template functions. */
+export function buildWorkspaceContext(ws: CoderWorkspace, coderBaseUrl?: string): WorkspaceContext {
+  const apps: WorkspaceApp[] = ws.latest_build.resources
+    .flatMap((r) => r.agents ?? [])
+    .flatMap((a) => a.apps ?? [])
+    .map((a) => ({
+      slug: a.slug,
+      displayName: a.display_name,
+      subdomainName: a.subdomain_name,
+      url: a.url,
+    }));
+
+  const base = (coderBaseUrl ?? "").replace(/\/$/, "");
+
+  return {
+    name: ws.name,
+    templateName: ws.template_name,
+    apps,
+    appUrl(slug: string): string {
+      const app = apps.find((a) => a.slug === slug);
+      if (!app) {
+        throw new Error(`Workspace "${ws.name}" has no app with slug "${slug}"`);
+      }
+      if (app.subdomainName) {
+        if (!base) {
+          throw new Error(`Coder base URL required to resolve subdomain URL for app "${slug}"`);
+        }
+        const host = new URL(base).host;
+        const protocol = new URL(base).protocol;
+        return `${protocol}//${app.subdomainName}.${host}`;
+      }
+      if (app.url) return app.url;
+      throw new Error(`App "${slug}" on workspace "${ws.name}" has no resolvable URL`);
+    },
+    raw: ws,
+  };
+}
+
 /** List all openable apps for a workspace (Dashboard, VS Code, and custom apps). */
 export function listOpenableApps(ws: CoderWorkspace): Array<{ slug: string; label: string }> {
   const agents = ws.latest_build.resources.flatMap(r => r.agents ?? []);
