@@ -7,6 +7,7 @@ import {
   listWorkspaces,
   updateWorkspace,
 } from "../lib/coder.ts";
+import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 
 export const updateCommand = defineCommand({
   meta: {
@@ -52,8 +53,18 @@ export const updateCommand = defineCommand({
       return;
     }
 
-    consola.start(`Updating ${pc.cyan(wsName)} to latest template version...`);
-    await updateWorkspace(wsName);
-    consola.success(`${pc.cyan(wsName)} updated`);
+    const spinner = p.spinner();
+    const heading = `Updating ${pc.cyan(wsName)} to latest template`;
+    spinner.start(heading);
+    try {
+      await updateWorkspace(wsName, {
+        onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
+      });
+      spinner.stop(`${pc.cyan(wsName)} updated`);
+    } catch (err) {
+      spinner.error(`Failed to update ${pc.cyan(wsName)}`);
+      await printCoderFailure(err, { workspace: wsName });
+      throw err;
+    }
   },
 });

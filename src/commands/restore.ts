@@ -13,6 +13,7 @@ import {
   buildWorkspaceContext,
   getCoderUrl,
 } from "../lib/coder.ts";
+import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 import {
   getTemplateSource,
   materializeTemplate,
@@ -158,13 +159,29 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   }
 
   const status = workspaceStatus(coder);
-  if (status === "stopped") {
-    spinner.message(`Starting ${layout.coder_ws}`);
-    await startWorkspace(layout.coder_ws);
-    await waitForWorkspace(layout.coder_ws);
-  } else if (status !== "running") {
-    spinner.message(`Waiting for ${layout.coder_ws} (${status})`);
-    await waitForWorkspace(layout.coder_ws);
+  try {
+    if (status === "stopped") {
+      const startHeading = `Starting ${layout.coder_ws}`;
+      spinner.message(startHeading);
+      await startWorkspace(layout.coder_ws, {
+        onLine: (line) => spinner.message(formatLogForSpinner(startHeading, line)),
+      });
+      const waitHeading = `Waiting for ${layout.coder_ws}`;
+      spinner.message(waitHeading);
+      await waitForWorkspace(layout.coder_ws, undefined, (line) =>
+        spinner.message(formatLogForSpinner(waitHeading, line)),
+      );
+    } else if (status !== "running") {
+      const waitHeading = `Waiting for ${layout.coder_ws} (${status})`;
+      spinner.message(waitHeading);
+      await waitForWorkspace(layout.coder_ws, undefined, (line) =>
+        spinner.message(formatLogForSpinner(waitHeading, line)),
+      );
+    }
+  } catch (err) {
+    spinner.error(`Failed to bring up ${pc.bold(layout.coder_ws)}`);
+    await printCoderFailure(err, { workspace: layout.coder_ws });
+    throw err;
   }
 
   // 2. Resolve template

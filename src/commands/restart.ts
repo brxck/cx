@@ -9,6 +9,7 @@ import {
   restartWorkspace,
   type CoderWorkspace,
 } from "../lib/coder.ts";
+import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 
 export interface RunRestartOpts {
   ws: CoderWorkspace;
@@ -16,9 +17,19 @@ export interface RunRestartOpts {
 
 export async function runRestart(opts: RunRestartOpts): Promise<void> {
   const { ws } = opts;
-  consola.start(`Restarting ${pc.cyan(ws.name)}...`);
-  await restartWorkspace(ws.name);
-  consola.success(`${pc.cyan(ws.name)} restarted`);
+  const spinner = p.spinner();
+  const heading = `Restarting ${pc.cyan(ws.name)}`;
+  spinner.start(heading);
+  try {
+    await restartWorkspace(ws.name, {
+      onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
+    });
+    spinner.stop(`${pc.cyan(ws.name)} restarted`);
+  } catch (err) {
+    spinner.error(`Failed to restart ${pc.cyan(ws.name)}`);
+    await printCoderFailure(err, { workspace: ws.name });
+    throw err;
+  }
 }
 
 export const restartCommand = defineCommand({

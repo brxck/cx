@@ -122,11 +122,82 @@ export async function openInBrowser(url: string): Promise<void> {
   await $`open ${url}`.quiet();
 }
 
-/** Create a new Coder workspace. Streams build logs to stderr. */
+export interface LogStreamOpts {
+  /** Called for every log line (stdout + stderr, interleaved). */
+  onLine?: (line: string) => void;
+}
+
+/** Error thrown when a coder subprocess exits non-zero. Carries a ring buffer of the last log lines. */
+export class CoderCommandError extends Error {
+  command: string;
+  code: number;
+  tail: string[];
+  constructor(command: string, code: number, tail: string[]) {
+    super(`coder ${command} exited with code ${code}`);
+    this.name = "CoderCommandError";
+    this.command = command;
+    this.code = code;
+    this.tail = tail;
+  }
+}
+
+const LOG_TAIL_SIZE = 20;
+
+/**
+ * Spawn a coder subprocess, streaming stdout + stderr line-by-line into a ring buffer.
+ * When onLine is provided, lines are delivered only to the callback. Otherwise they are
+ * echoed to stderr (preserving the legacy "inherit" behavior for callers that haven't opted in).
+ */
+async function runCoderProcess(
+  args: string[],
+  opts?: LogStreamOpts,
+): Promise<{ code: number; tail: string[] }> {
+  const tail: string[] = [];
+  const pushLine = (line: string) => {
+    if (!line) return;
+    tail.push(line);
+    if (tail.length > LOG_TAIL_SIZE) tail.shift();
+    if (opts?.onLine) {
+      opts.onLine(line);
+    } else {
+      process.stderr.write(line + "\n");
+    }
+  };
+
+  const proc = Bun.spawn(args, {
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const drain = async (stream: ReadableStream<Uint8Array> | null) => {
+    if (!stream) return;
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) pushLine(line);
+      }
+      if (buffer) pushLine(buffer);
+    } catch {}
+  };
+
+  await Promise.all([drain(proc.stdout), drain(proc.stderr)]);
+  const code = await proc.exited;
+  return { code, tail };
+}
+
+/** Create a new Coder workspace. Streams build logs through opts.onLine (defaults to stderr). */
 export async function createWorkspace(
   name: string,
   template: string,
-  opts?: { params?: Record<string, string>; preset?: string },
+  opts?: { params?: Record<string, string>; preset?: string } & LogStreamOpts,
 ): Promise<void> {
   const args = ["coder", "create", "-t", template, name, "-y", "--use-parameter-defaults"];
   if (opts?.preset) {
@@ -137,75 +208,69 @@ export async function createWorkspace(
       args.push("--parameter", `${key}=${value}`);
     }
   }
-  const proc = Bun.spawn(args, {
-    stdin: "inherit",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
-  if (code !== 0) throw new Error(`coder create exited with code ${code}`);
+  const { code, tail } = await runCoderProcess(args, opts);
+  if (code !== 0) throw new CoderCommandError("create", code, tail);
 }
 
 /** Stop a running Coder workspace. */
-export async function stopWorkspace(name: string): Promise<void> {
-  const proc = Bun.spawn(["coder", "stop", name, "-y"], {
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
-  if (code !== 0) throw new Error(`coder stop exited with code ${code}`);
+export async function stopWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
+  const { code, tail } = await runCoderProcess(["coder", "stop", name, "-y"], opts);
+  if (code !== 0) throw new CoderCommandError("stop", code, tail);
 }
 
-/** Start a stopped Coder workspace. Streams build logs to stderr. */
-export async function startWorkspace(name: string): Promise<void> {
-  const proc = Bun.spawn(["coder", "start", name], {
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
-  if (code !== 0) throw new Error(`coder start exited with code ${code}`);
+/** Start a stopped Coder workspace. Streams build logs through opts.onLine (defaults to stderr). */
+export async function startWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
+  const { code, tail } = await runCoderProcess(["coder", "start", name], opts);
+  if (code !== 0) throw new CoderCommandError("start", code, tail);
 }
 
 /**
  * Poll until a workspace is running with a connected agent.
- * Streams build logs via `coder logs -f` while waiting.
- * Throws after timeout (default 5 minutes).
+ * Streams build logs via `coder logs -f` while waiting, keeping a ring buffer of the
+ * last lines. On timeout or agent start_error, throws a CoderCommandError with that tail.
  */
 export async function waitForWorkspace(
   name: string,
   timeoutMs = 5 * 60 * 1000,
   onLog?: (line: string) => void,
 ): Promise<void> {
-  // Stream build logs in the background
+  const tail: string[] = [];
+
   const logProc = Bun.spawn(["coder", "logs", "-f", name], {
     stdin: "ignore",
-    stdout: onLog ? "pipe" : "inherit",
-    stderr: onLog ? "pipe" : "inherit",
+    stdout: "pipe",
+    stderr: "pipe",
   });
 
-  // Pipe log lines to callback if provided
-  if (onLog && logProc.stdout) {
-    (async () => {
-      const reader = logProc.stdout!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop()!;
-          for (const line of lines) {
-            if (line.trim()) onLog(line);
-          }
+  const drain = async (stream: ReadableStream<Uint8Array> | null) => {
+    if (!stream) return;
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line) continue;
+          tail.push(line);
+          if (tail.length > LOG_TAIL_SIZE) tail.shift();
+          if (onLog) onLog(line);
         }
-        if (buffer.trim()) onLog(buffer);
-      } catch {}
-    })();
-  }
+      }
+      if (buffer) {
+        tail.push(buffer);
+        if (tail.length > LOG_TAIL_SIZE) tail.shift();
+        if (onLog) onLog(buffer);
+      }
+    } catch {}
+  };
+
+  void drain(logProc.stdout);
+  void drain(logProc.stderr);
 
   try {
     const start = Date.now();
@@ -219,12 +284,20 @@ export async function waitForWorkspace(
         if (allReady) return;
         if (allConnected && agents.some((a) => a.lifecycle_state === "start_error" || a.lifecycle_state === "start_timeout")) {
           const bad = agents.find((a) => a.lifecycle_state === "start_error" || a.lifecycle_state === "start_timeout")!;
-          throw new Error(`Agent ${bad.name} startup ${bad.lifecycle_state} for workspace "${name}"`);
+          throw new CoderCommandError(
+            `logs ${name}`,
+            -1,
+            [...tail, `Agent ${bad.name} startup ${bad.lifecycle_state}`],
+          );
         }
       }
       await Bun.sleep(3000);
     }
-    throw new Error(`Timed out waiting for workspace "${name}" to be ready`);
+    throw new CoderCommandError(
+      `logs ${name}`,
+      -1,
+      [...tail, `Timed out waiting for workspace "${name}" to be ready`],
+    );
   } finally {
     logProc.kill();
   }
@@ -352,26 +425,16 @@ export async function streamLogs(
   return proc.exited;
 }
 
-/** Update an outdated workspace to the latest template version. Streams build logs. */
-export async function updateWorkspace(name: string): Promise<void> {
-  const proc = Bun.spawn(["coder", "update", name, "-y"], {
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
-  if (code !== 0) throw new Error(`coder update exited with code ${code}`);
+/** Update an outdated workspace to the latest template version. */
+export async function updateWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
+  const { code, tail } = await runCoderProcess(["coder", "update", name, "-y"], opts);
+  if (code !== 0) throw new CoderCommandError("update", code, tail);
 }
 
-/** Restart a running Coder workspace. Streams build logs. */
-export async function restartWorkspace(name: string): Promise<void> {
-  const proc = Bun.spawn(["coder", "restart", name, "-y"], {
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
-  if (code !== 0) throw new Error(`coder restart exited with code ${code}`);
+/** Restart a running Coder workspace. */
+export async function restartWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
+  const { code, tail } = await runCoderProcess(["coder", "restart", name, "-y"], opts);
+  if (code !== 0) throw new CoderCommandError("restart", code, tail);
 }
 
 /** SSH into a workspace (replaces the current process). */

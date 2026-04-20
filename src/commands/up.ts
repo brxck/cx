@@ -14,6 +14,7 @@ import {
   getCoderUrl,
   type WorkspaceContext,
 } from "../lib/coder.ts";
+import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 import {
   resolveTemplateSource,
   listTemplateSources,
@@ -165,34 +166,57 @@ async function ensureCoderWorkspace(
   const workspaces = await listCoderWorkspaces();
   const existing = workspaces.find((ws) => ws.name === name);
 
-  if (!existing) {
-    spinner.stop(`Creating workspace ${pc.bold(name)}`);
-    await createWorkspace(name, coder.template, {
-      params: coder.parameters,
-      preset: coder.preset,
-    });
-    await waitForWorkspace(name);
-    p.log.success(`Workspace ${pc.bold(name)} created and ready`);
-    return;
-  }
+  const status = existing ? workspaceStatus(existing) : null;
 
-  const status = workspaceStatus(existing);
-  if (status === "running") {
+  if (existing && status === "running") {
     spinner.stop(`Workspace ${pc.bold(name)} is already running`);
     return;
   }
 
-  if (status === "stopped") {
-    spinner.stop(`Starting workspace ${pc.bold(name)}`);
-    await startWorkspace(name);
-    await waitForWorkspace(name);
-    p.log.success(`Workspace ${pc.bold(name)} started and ready`);
-    return;
-  }
+  try {
+    if (!existing) {
+      const heading = `Creating ${pc.bold(name)}`;
+      spinner.message(heading);
+      await createWorkspace(name, coder.template, {
+        params: coder.parameters,
+        preset: coder.preset,
+        onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
+      });
+      const waitHeading = `Waiting for ${pc.bold(name)}`;
+      spinner.message(waitHeading);
+      await waitForWorkspace(name, undefined, (line) =>
+        spinner.message(formatLogForSpinner(waitHeading, line)),
+      );
+      spinner.stop(`Workspace ${pc.bold(name)} created and ready`);
+      return;
+    }
 
-  spinner.stop(`Workspace is ${status}, waiting for it to be ready`);
-  await waitForWorkspace(name);
-  p.log.success(`Workspace ${pc.bold(name)} is ready`);
+    if (status === "stopped") {
+      const heading = `Starting ${pc.bold(name)}`;
+      spinner.message(heading);
+      await startWorkspace(name, {
+        onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
+      });
+      const waitHeading = `Waiting for ${pc.bold(name)}`;
+      spinner.message(waitHeading);
+      await waitForWorkspace(name, undefined, (line) =>
+        spinner.message(formatLogForSpinner(waitHeading, line)),
+      );
+      spinner.stop(`Workspace ${pc.bold(name)} started and ready`);
+      return;
+    }
+
+    const waitHeading = `Waiting for ${pc.bold(name)} (${status})`;
+    spinner.message(waitHeading);
+    await waitForWorkspace(name, undefined, (line) =>
+      spinner.message(formatLogForSpinner(waitHeading, line)),
+    );
+    spinner.stop(`Workspace ${pc.bold(name)} is ready`);
+  } catch (err) {
+    spinner.error(`Failed to prepare workspace ${pc.bold(name)}`);
+    await printCoderFailure(err, { workspace: name });
+    throw err;
+  }
 }
 
 async function fetchWorkspaceContext(name: string): Promise<WorkspaceContext> {

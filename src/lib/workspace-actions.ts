@@ -11,6 +11,7 @@ import {
   workspaceStatus,
   type CoderWorkspace,
 } from "./coder.ts";
+import { formatLogForSpinner, printCoderFailure } from "./coder-ui.ts";
 import { type LayoutEntry } from "./store.ts";
 import { pickLayout } from "./workspace-picker.ts";
 import { runSsh } from "../commands/ssh.ts";
@@ -145,10 +146,23 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
     isAvailable: ({ ws }) => isStopped(ws),
     async run({ ws }) {
       const spinner = p.spinner();
-      spinner.start(`Starting workspace ${pc.bold(ws.name)}`);
-      await startWorkspace(ws.name);
-      await waitForWorkspace(ws.name);
-      spinner.stop(`Workspace ${pc.bold(ws.name)} started and ready`);
+      const startHeading = `Starting ${pc.bold(ws.name)}`;
+      spinner.start(startHeading);
+      try {
+        await startWorkspace(ws.name, {
+          onLine: (line) => spinner.message(formatLogForSpinner(startHeading, line)),
+        });
+        const waitHeading = `Waiting for ${pc.bold(ws.name)}`;
+        spinner.message(waitHeading);
+        await waitForWorkspace(ws.name, undefined, (line) =>
+          spinner.message(formatLogForSpinner(waitHeading, line)),
+        );
+        spinner.stop(`Workspace ${pc.bold(ws.name)} started and ready`);
+      } catch (err) {
+        spinner.error(`Failed to start ${pc.bold(ws.name)}`);
+        await printCoderFailure(err, { workspace: ws.name });
+        throw err;
+      }
     },
   },
   {
@@ -157,9 +171,19 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
     group: "lifecycle",
     isAvailable: ({ ws }) => isRunning(ws),
     async run({ ws }) {
-      consola.start(`Stopping ${pc.cyan(ws.name)}...`);
-      await stopWorkspace(ws.name);
-      consola.success(`${pc.cyan(ws.name)} stopped`);
+      const spinner = p.spinner();
+      const heading = `Stopping ${pc.cyan(ws.name)}`;
+      spinner.start(heading);
+      try {
+        await stopWorkspace(ws.name, {
+          onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
+        });
+        spinner.stop(`${pc.cyan(ws.name)} stopped`);
+      } catch (err) {
+        spinner.error(`Failed to stop ${pc.cyan(ws.name)}`);
+        await printCoderFailure(err, { workspace: ws.name });
+        throw err;
+      }
     },
   },
   {
@@ -178,9 +202,19 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
     hint: ({ ws }) => (ws.outdated ? "template is outdated" : undefined),
     isAvailable: ({ ws }) => isStopped(ws) && ws.outdated,
     async run({ ws }) {
-      consola.start(`Updating ${pc.cyan(ws.name)} to latest template version...`);
-      await updateWorkspace(ws.name);
-      consola.success(`${pc.cyan(ws.name)} updated`);
+      const spinner = p.spinner();
+      const heading = `Updating ${pc.cyan(ws.name)} to latest template`;
+      spinner.start(heading);
+      try {
+        await updateWorkspace(ws.name, {
+          onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
+        });
+        spinner.stop(`${pc.cyan(ws.name)} updated`);
+      } catch (err) {
+        spinner.error(`Failed to update ${pc.cyan(ws.name)}`);
+        await printCoderFailure(err, { workspace: ws.name });
+        throw err;
+      }
     },
   },
 

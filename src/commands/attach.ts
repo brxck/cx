@@ -12,6 +12,7 @@ import {
   listWorkspaces as listCoderWorkspaces,
   type CoderWorkspace,
 } from "../lib/coder.ts";
+import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 import {
   resolveTemplateSource,
   listTemplateSources,
@@ -49,10 +50,23 @@ export async function runAttach(opts: RunAttachOpts): Promise<void> {
         process.exit(0);
       }
       const spinner = p.spinner();
-      spinner.start(`Starting workspace ${pc.bold(workspace.name)}`);
-      await startWorkspace(workspace.name);
-      await waitForWorkspace(workspace.name);
-      spinner.stop(`Workspace ${pc.bold(workspace.name)} started and ready`);
+      const startHeading = `Starting ${pc.bold(workspace.name)}`;
+      spinner.start(startHeading);
+      try {
+        await startWorkspace(workspace.name, {
+          onLine: (line) => spinner.message(formatLogForSpinner(startHeading, line)),
+        });
+        const waitHeading = `Waiting for ${pc.bold(workspace.name)}`;
+        spinner.message(waitHeading);
+        await waitForWorkspace(workspace.name, undefined, (line) =>
+          spinner.message(formatLogForSpinner(waitHeading, line)),
+        );
+        spinner.stop(`Workspace ${pc.bold(workspace.name)} started and ready`);
+      } catch (err) {
+        spinner.error(`Failed to start workspace ${pc.bold(workspace.name)}`);
+        await printCoderFailure(err, { workspace: workspace.name });
+        throw err;
+      }
     } else {
       p.log.error(
         `Workspace ${pc.bold(workspace.name)} is ${status} — it must be running to attach`,

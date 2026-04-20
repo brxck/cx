@@ -2,6 +2,7 @@ import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { stopWorkspace, requireCoderLogin } from "../lib/coder.ts";
+import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 import * as cmux from "../lib/cmux.ts";
 import { getAllLayouts, getLayout, getLayoutsByPath, removeLayout, type LayoutEntry } from "../lib/store.ts";
 import { pickLayout } from "../lib/workspace-picker.ts";
@@ -31,9 +32,19 @@ export async function runDown(opts: RunDownOpts): Promise<void> {
   }
 
   if (shouldStop) {
-    p.log.step(`Stopping workspace ${pc.bold(layout.coder_ws)}`);
-    await stopWorkspace(layout.coder_ws);
-    p.log.success(`Workspace ${pc.bold(layout.coder_ws)} stopped`);
+    const spinner = p.spinner();
+    const heading = `Stopping ${pc.bold(layout.coder_ws)}`;
+    spinner.start(heading);
+    try {
+      await stopWorkspace(layout.coder_ws, {
+        onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
+      });
+      spinner.stop(`Workspace ${pc.bold(layout.coder_ws)} stopped`);
+    } catch (err) {
+      spinner.error(`Failed to stop ${pc.bold(layout.coder_ws)}`);
+      await printCoderFailure(err, { workspace: layout.coder_ws });
+      throw err;
+    }
   }
 
   removeLayout(layout.name);
