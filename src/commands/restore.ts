@@ -19,6 +19,7 @@ import {
 import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
 import {
   getAllLayouts,
+  getLayout,
   getSessionsForLayout,
   recordSession,
   updateLayout,
@@ -31,6 +32,7 @@ import {
   startPortForwarding,
 } from "../lib/layout-builder.ts";
 import { sshHost } from "../lib/ssh.ts";
+import { fuzzyMatch, pickLayout } from "../lib/workspace-picker.ts";
 
 export const restoreCommand = defineCommand({
   meta: {
@@ -41,7 +43,7 @@ export const restoreCommand = defineCommand({
     layout: {
       type: "positional",
       required: false,
-      description: "Specific layout to restore (default: all)",
+      description: "Layout to restore",
     },
     "dry-run": {
       type: "boolean",
@@ -57,77 +59,91 @@ export const restoreCommand = defineCommand({
   async run({ args }) {
     await requireCoderLogin();
 
-    const allLayouts = getAllLayouts();
-    let layouts = args.layout
-      ? allLayouts.filter((l) => l.name === args.layout)
-      : allLayouts;
-
-    if (layouts.length === 0) {
-      consola.info("No layouts to restore");
-      return;
-    }
-
-    // Filter out already-active Cmux workspaces
     let cmuxWorkspaces: cmux.CmuxWorkspace[] = [];
     try {
       cmuxWorkspaces = await cmux.listWorkspaces();
     } catch {}
-    const activeCmuxRefs = new Set(cmuxWorkspaces.map((w) => w.ref));
+    const activeRefs = new Set(cmuxWorkspaces.map((w) => w.ref));
 
-    const toRestore: LayoutEntry[] = [];
-    const alreadyActive: LayoutEntry[] = [];
+    const isRestorable = (l: LayoutEntry): boolean =>
+      l.cmux_id === "headless" || !activeRefs.has(l.cmux_id);
 
-    for (const layout of layouts) {
-      if (layout.cmux_id === "headless") {
-        toRestore.push(layout); // headless layouts need cmux presentation
-      } else if (activeCmuxRefs.has(layout.cmux_id)) {
-        alreadyActive.push(layout);
-      } else {
-        toRestore.push(layout);
-      }
-    }
-
-    // Sort: persistent first, then by last active
-    toRestore.sort((a, b) => {
-      if (a.type !== b.type) return a.type === "persistent" ? -1 : 1;
-      return new Date(b.active_at).getTime() - new Date(a.active_at).getTime();
-    });
+    const layout = await resolveLayout(args.layout as string | undefined, isRestorable);
+    if (!layout) return;
 
     if (args["dry-run"]) {
-      renderDryRun(toRestore, alreadyActive);
+      renderDryRun(layout);
       return;
     }
 
-    p.intro(pc.bold("cx restore"));
+    p.intro(pc.bold(`cx restore ${pc.cyan(layout.name)}`));
 
-    // Ensure SSH config once
-    if (toRestore.length > 0) {
-      const sshSpinner = p.spinner();
-      sshSpinner.start("Updating SSH config");
-      await ensureSshConfig();
-      sshSpinner.stop("SSH config updated");
-    }
-
-    // Restore each layout sequentially
-    const results = { restored: 0, skipped: 0, failed: 0 };
+    const sshSpinner = p.spinner();
+    sshSpinner.start("Updating SSH config");
+    await ensureSshConfig();
+    sshSpinner.stop("SSH config updated");
 
     const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
+    await restoreLayout(layout, cliVars);
 
-    for (const layout of toRestore) {
-      try {
-        await restoreLayout(layout, cliVars);
-        results.restored++;
-      } catch (err) {
-        consola.warn(`Failed to restore ${layout.name}: ${err}`);
-        results.failed++;
-      }
-    }
-
-    p.outro(
-      `${results.restored} restored, ${alreadyActive.length} already active, ${results.failed} failed`,
-    );
+    p.outro(`${pc.green("✓")} Restored ${pc.bold(layout.name)}`);
   },
 });
+
+async function resolveLayout(
+  name: string | undefined,
+  isRestorable: (l: LayoutEntry) => boolean,
+): Promise<LayoutEntry | null> {
+  if (name) {
+    const exact = getLayout(name);
+    if (exact) {
+      if (!isRestorable(exact)) {
+        consola.error(
+          `Layout ${pc.bold(exact.name)} is already active. Use ${pc.cyan(`cx activate ${exact.name}`)} to switch to it.`,
+        );
+        process.exit(1);
+      }
+      return exact;
+    }
+
+    const all = getAllLayouts();
+    const matches = all.filter((l) => fuzzyMatch(name, l.name));
+    if (matches.length === 1) {
+      const match = matches[0]!;
+      if (!isRestorable(match)) {
+        consola.error(
+          `Layout ${pc.bold(match.name)} is already active. Use ${pc.cyan(`cx activate ${match.name}`)} to switch to it.`,
+        );
+        process.exit(1);
+      }
+      return match;
+    }
+    if (matches.length > 1) {
+      const restorable = matches.filter(isRestorable);
+      if (restorable.length === 0) {
+        consola.error(`All layouts matching "${name}" are already active.`);
+        process.exit(1);
+      }
+      return pickLayout({ layouts: restorable, message: `Multiple matches for "${name}"` });
+    }
+
+    consola.error(`Layout "${name}" not found`);
+    process.exit(1);
+  }
+
+  const restorable = getAllLayouts().filter(isRestorable);
+  if (restorable.length === 0) {
+    consola.info("No layouts to restore");
+    return null;
+  }
+
+  const selected = await pickLayout({ layouts: restorable, message: "Select a layout to restore" });
+  if (!selected) {
+    consola.info("Cancelled");
+    process.exit(0);
+  }
+  return selected;
+}
 
 async function restoreLayout(layout: LayoutEntry, cliVars: Record<string, string> = {}): Promise<void> {
   const spinner = p.spinner();
@@ -229,25 +245,12 @@ async function probeLiveSessions(coderWs: string): Promise<Set<string>> {
   }
 }
 
-function renderDryRun(toRestore: LayoutEntry[], alreadyActive: LayoutEntry[]): void {
-  if (toRestore.length > 0) {
-    consola.log(pc.bold("Would restore:"));
-    for (const l of toRestore) {
-      const sessions = getSessionsForLayout(l.name);
-      const sessionInfo = sessions.length > 0 ? `(${sessions.length} sessions)` : "";
-      const headless = l.cmux_id === "headless" ? pc.yellow("[headless]") : "";
-      consola.log(
-        `  ${pc.bold(l.name)}  ${l.coder_ws}  ${pc.dim(l.type)}  ${headless}  ${pc.dim(sessionInfo)}`,
-      );
-    }
-  }
-  if (alreadyActive.length > 0) {
-    consola.log(pc.bold("\nAlready active:"));
-    for (const l of alreadyActive) {
-      consola.log(`  ${pc.bold(l.name)}  ${pc.dim(l.cmux_id)}`);
-    }
-  }
-  if (toRestore.length === 0 && alreadyActive.length === 0) {
-    consola.info("Nothing to restore");
-  }
+function renderDryRun(layout: LayoutEntry): void {
+  const sessions = getSessionsForLayout(layout.name);
+  const sessionInfo = sessions.length > 0 ? `(${sessions.length} sessions)` : "";
+  const headless = layout.cmux_id === "headless" ? pc.yellow("[headless]") : "";
+  consola.log(pc.bold("Would restore:"));
+  consola.log(
+    `  ${pc.bold(layout.name)}  ${layout.coder_ws}  ${pc.dim(layout.type)}  ${headless}  ${pc.dim(sessionInfo)}`,
+  );
 }

@@ -19,7 +19,7 @@ cx
 ├── activate [layout]        # focus a layout in cmux
 ├── find <query>             # search layouts by name/branch/template
 ├── status                   # dashboard of all layouts + workspaces
-├── restore                  # re-establish layouts after restart
+├── restore [layout]         # re-establish a layout after restart
 └── coder                    # Coder workspace utilities
     ├── list                 # list workspaces (enhanced)
     ├── ssh [workspace]      # SSH with session management
@@ -76,9 +76,9 @@ Locate layouts by name, git branch checked out in the workspace, or Coder templa
 
 Dashboard view showing all layouts with their workspace state (running/stopped/starting), active sessions, git branch, and health. Non-interactive by default, interactive with `--interactive`.
 
-#### `restore`
+#### `restore [layout]`
 
-Re-establish all layouts after a restart. Reads persisted layout state, starts any stopped workspaces, and re-invokes the Cmux custom commands.
+Re-establish a single layout after a restart. Resolves the target by exact name, fuzzy match, or interactive picker (scoped to layouts that aren't already active in Cmux), starts the Coder workspace if stopped, and re-invokes the Cmux custom command. Passing the name of an already-active layout errors with a hint to use `cx activate` instead.
 
 ### Coder Utilities (`coder <cmd>`)
 

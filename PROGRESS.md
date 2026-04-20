@@ -19,7 +19,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `detach [layout]` | Done | Closes Cmux workspace, removes from store and cmux.json, keeps Coder workspace running. Auto-detects from cwd. |
 | `activate [layout]` | Done | Exact name, fuzzy match, or interactive picker. Switches Cmux workspace and touches store. |
 | `find <query>` | Done | Fuzzy search across name/coder_ws/template/branch/path, `--branch` with live sidebar state, `--path` flag. Activates on selection. |
-| `restore` | Done | Restores layouts after restart: checks Coder workspace status (starts if stopped, skips if deleted), probes live ZMX sessions via SSH, reuses alive sessions / restarts dead ones, rebuilds Cmux layout, updates store, starts port forwarding, regenerates cmux.json. `--dry-run`/`-n` previews. Sorts persistent-first. |
+| `restore [layout]` | Done | Restores a single layout after restart via exact/fuzzy/picker resolution (picker scoped to non-active layouts): checks Coder workspace status (starts if stopped, skips if deleted), probes live ZMX sessions via SSH, reuses alive sessions / restarts dead ones, rebuilds Cmux layout, updates store, starts port forwarding, regenerates cmux.json. Errors with `cx activate` hint if the target is already active. `--dry-run`/`-n` previews. |
 | `init` | Done | Interactive config setup. Auto-detects username from `coder whoami`, prompts for confirmation and agent name. Saves to `~/.config/cx/config.json`. Configures SSH: runs `coder config-ssh`, inserts ZMX Match block into `~/.ssh/config` for session-based SSH (idempotent). |
 
 ## Features
