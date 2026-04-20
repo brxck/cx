@@ -243,8 +243,10 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   for (let i = 0; i < sessionsToRestart.length; i++) {
     const s = sessionsToRestart[i]!;
     spinner.message(`Restarting ZMX session ${pc.cyan(s.name)} (${i + 1}/${sessionsToRestart.length})`);
-    const cmd = s.command ?? "bash";
-    await restartZmxSession(restartHost, s.name, cmd);
+    // Empty string tells zmx to spawn a plain login shell (no task tracker
+     // wrapper in the scrollback). "bash" would be interpreted as an explicit
+     // task, which zmx wraps with `; echo ZMX_TASK_COMPLETED:$?`.
+    await restartZmxSession(restartHost, s.name, s.command ?? "");
   }
 
   // 6. Build Cmux layout (connects to existing/restarted sessions).
