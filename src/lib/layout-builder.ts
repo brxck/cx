@@ -78,7 +78,7 @@ export async function startHeadlessSessions(
     const sessionName = surface.session!;
     const command = normalizeCommand(surface.command, surface.cwd) ?? "";
     const host = await sshHost(coderWsName);
-    await Bun.$`ssh ${host} -- zmx run ${sessionName} ${command}`.quiet();
+    await Bun.$`ssh -n ${host} -- zmx run ${sessionName} ${command}`.quiet();
     sessions.push({ name: sessionName, command });
   }
 

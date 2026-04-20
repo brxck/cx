@@ -185,6 +185,7 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   }
 
   // 2. Resolve template
+  spinner.message(`Resolving template ${pc.bold(layout.template ?? "default")}`);
   const source = layout.template ? await getTemplateSource(layout.template) : null;
 
   const fallbackConfig: TemplateConfig = {
@@ -210,6 +211,7 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   // Restore never prompts and never re-runs commands — rebuild the layout shape
   // from persisted state, then strip commands so existing ZMX sessions are reattached
   // without re-executing their original commands.
+  spinner.message("Materializing layout");
   const { template: effectiveTemplate } = await materializeTemplate(effectiveSource, {
     persistedVars,
     interactive: false,
@@ -218,6 +220,7 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   stripCommands(effectiveTemplate.layout);
 
   // 3. Probe remote for live ZMX sessions
+  spinner.message("Probing live ZMX sessions");
   const storedSessions = getSessionsForLayout(layout.name);
   const liveSessionNames = await probeLiveSessions(layout.coder_ws);
 
@@ -236,13 +239,17 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   }
 
   // 5. Restart dead sessions
-  for (const s of sessionsToRestart) {
+  const restartHost = await sshHost(layout.coder_ws);
+  for (let i = 0; i < sessionsToRestart.length; i++) {
+    const s = sessionsToRestart[i]!;
+    spinner.message(`Restarting ZMX session ${pc.cyan(s.name)} (${i + 1}/${sessionsToRestart.length})`);
     const cmd = s.command ?? "bash";
-    const host = await sshHost(layout.coder_ws);
-    await Bun.$`ssh ${host} -- zmx run ${s.name} ${cmd}`.quiet();
+    await restartZmxSession(restartHost, s.name, cmd);
   }
 
-  // 6. Build Cmux layout (connects to existing/restarted sessions)
+  // 6. Build Cmux layout (connects to existing/restarted sessions).
+  // Stop the outer spinner first so buildCmuxLayout's spinner doesn't collide.
+  spinner.stop(`Prepared ${pc.bold(layout.name)}`);
   const { cmuxRef, sessions } = await buildCmuxLayout(
     layout.name,
     effectiveTemplate,
@@ -263,7 +270,31 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
     startPortForwarding(layout.coder_ws, effectiveTemplate.ports);
   }
 
-  spinner.stop(`Restored ${pc.bold(layout.name)} — ${pc.cyan(cmuxRef)}`);
+  p.log.success(`Restored ${pc.bold(layout.name)} — ${pc.cyan(cmuxRef)}`);
+}
+
+/**
+ * Spawn a detached ZMX session on the remote. Guards against SSH hanging even
+ * when zmx leaks its parent stdout/stderr into the detached process: we close
+ * stdin (ssh -n), discard remote output, and kill the SSH process after 15s.
+ */
+async function restartZmxSession(host: string, name: string, cmd: string): Promise<void> {
+  const remote = `zmx run ${shellQuote(name)} ${shellQuote(cmd)} </dev/null >/dev/null 2>&1`;
+  const proc = Bun.spawn(["ssh", "-n", host, "--", remote], {
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  const killer = setTimeout(() => proc.kill(), 15_000);
+  try {
+    await proc.exited;
+  } finally {
+    clearTimeout(killer);
+  }
+}
+
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`;
 }
 
 async function probeLiveSessions(coderWs: string): Promise<Set<string>> {
