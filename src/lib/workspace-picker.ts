@@ -80,6 +80,8 @@ export async function pickWorkspace(opts?: {
 
   let filtered = workspaces;
   if (opts?.filter) {
+    const exact = workspaces.find((ws) => ws.name === opts.filter);
+    if (exact) return exact;
     filtered = workspaces.filter((ws) => fuzzyMatch(opts.filter!, ws.name));
     if (filtered.length === 0) return null;
   }
