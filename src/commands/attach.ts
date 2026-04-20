@@ -7,18 +7,23 @@ import {
   requireCoderLogin,
   startWorkspace,
   waitForWorkspace,
+  buildWorkspaceContext,
+  getCoderUrl,
+  listWorkspaces as listCoderWorkspaces,
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import {
-  resolveTemplate,
+  resolveTemplateSource,
+  listTemplateSources,
+  getProjectTemplateSources,
+  prepareTemplate,
+  templateDisplay,
+  type TemplateSource,
   type TemplateConfig,
-  listTemplatesAsync,
-  getProjectTemplates,
 } from "../lib/templates.ts";
-import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
+import { parseVarsArg } from "../lib/variables.ts";
 import { saveLayout, getLayout, getSessionsForLayout, recordSession } from "../lib/store.ts";
-import { buildCmuxLayout, startPortForwarding, collectTerminalSurfaces } from "../lib/layout-builder.ts";
-import { isSplitNode, isPaneNode, type LayoutNode } from "../lib/templates.ts";
+import { buildCmuxLayout, startPortForwarding, collectTerminalSurfaces, stripCommands } from "../lib/layout-builder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 
 export interface RunAttachOpts {
@@ -60,92 +65,26 @@ export async function runAttach(opts: RunAttachOpts): Promise<void> {
 
   p.intro(pc.bold(`cx attach ${pc.cyan(layoutName)}`));
 
-  // Check for existing headless layout
   const existingLayout = getLayout(layoutName);
   const isHeadlessReattach = existingLayout?.cmux_id === "headless";
 
-  // Resolve template
-  let template: TemplateConfig;
-  let projectPath: string | null = null;
-
-  const buildDefault = (type: "persistent" | "ephemeral"): TemplateConfig => ({
-    name: type === "ephemeral" ? "default-ephemeral" : "default",
-    coder: { template: workspace.template_name },
-    type,
-    layout: {
-      pane: {
-        surfaces: [{ type: "terminal" }],
-      },
-    },
-  });
-
-  if (opts.template === "default") {
-    template = buildDefault("persistent");
-  } else if (opts.template === "default-ephemeral") {
-    template = buildDefault("ephemeral");
-  } else if (opts.template) {
-    const resolved = await resolveTemplate({ name: opts.template });
-    if (resolved) {
-      template = resolved.template;
-      projectPath = resolved.projectPath;
-    } else {
-      p.log.error(`Template ${pc.bold(opts.template)} not found`);
-      process.exit(1);
-    }
-  } else {
-    const project = await getProjectTemplates();
-    const projectTemplates = project?.templates ?? [];
-    const globalTemplates = await listTemplatesAsync();
-
-    type PickerEntry = {
-      template: TemplateConfig;
-      source: "project" | "global" | "default";
-      defaultType?: "persistent" | "ephemeral";
-    };
-    const entries: PickerEntry[] = [
-      ...projectTemplates.map((t) => ({ template: t, source: "project" as const })),
-      ...globalTemplates.map((t) => ({ template: t, source: "global" as const })),
-      { template: buildDefault("persistent"), source: "default" as const, defaultType: "persistent" as const },
-      { template: buildDefault("ephemeral"), source: "default" as const, defaultType: "ephemeral" as const },
-    ];
-
-    entries.sort((a, b) => {
-      if (a.source === "default" && b.source === "default") {
-        return a.defaultType === "persistent" ? -1 : 1;
-      }
-      if (a.source === "default") return 1;
-      if (b.source === "default") return -1;
-      return a.template.name.localeCompare(b.template.name);
-    });
-
-    const choice = await p.autocomplete({
-      message: "Select a template",
-      options: entries.map((e) => ({
-        value: e,
-        label:
-          e.source === "default"
-            ? `${pc.bold(e.template.name)}  ${pc.dim("single pane")}  ${pc.dim(e.defaultType!)}`
-            : `${pc.bold(e.template.name)}  ${pc.dim(e.template.coder.template)}  ${pc.dim(e.template.type)}${e.source === "project" ? `  ${pc.dim("(project)")}` : ""}`,
-      })),
-      placeholder: "Type to filter",
-    });
-
-    if (p.isCancel(choice)) {
-      p.cancel("Cancelled.");
-      process.exit(0);
-    }
-
-    const picked = choice as PickerEntry;
-    template = picked.template;
-    projectPath = picked.source === "project" ? (project?.projectPath ?? null) : null;
-  }
+  const { source, projectPath } = await resolveAttachSource(opts.template, workspace.template_name);
 
   const runCommands = opts.runCommands ?? false;
 
-  if (runCommands) {
-    const cliVars = opts.vars ? parseVarsArg(opts.vars) : {};
-    await resolveVariables(template, cliVars);
-  } else {
+  const cliVars = opts.vars ? parseVarsArg(opts.vars) : {};
+  const prepared = await prepareTemplate(source, { cliVars });
+
+  // Workspace is already running, so we can always fetch its context if needed.
+  const wsContext = prepared.needsWorkspace
+    ? buildWorkspaceContext(
+        (await listCoderWorkspaces()).find((w) => w.name === workspace.name) ?? workspace,
+        await getCoderUrl(),
+      )
+    : undefined;
+  const template = await prepared.finalize({ workspace: wsContext });
+
+  if (!runCommands) {
     stripCommands(template.layout);
   }
 
@@ -177,6 +116,7 @@ export async function runAttach(opts: RunAttachOpts): Promise<void> {
     template: template.name,
     type: template.type,
     path: projectPath,
+    vars: prepared.resolvedInputs,
   });
 
   for (const session of sessions) {
@@ -243,17 +183,105 @@ export const attachCommand = defineCommand({
   },
 });
 
-/** Remove command and cwd from all terminal surfaces in a layout tree. Mutates in place. */
-function stripCommands(node: LayoutNode): void {
-  if (isPaneNode(node)) {
-    for (const surface of node.pane.surfaces) {
-      if (surface.type === "terminal") {
-        delete surface.command;
-        delete surface.cwd;
-      }
-    }
-  } else if (isSplitNode(node)) {
-    stripCommands(node.children[0]);
-    stripCommands(node.children[1]);
-  }
+function buildDefaultSource(
+  coderTemplate: string,
+  type: "persistent" | "ephemeral",
+): TemplateSource {
+  const config: TemplateConfig = {
+    name: type === "ephemeral" ? "default-ephemeral" : "default",
+    coder: { template: coderTemplate },
+    type,
+    layout: { pane: { surfaces: [{ type: "terminal" }] } },
+  };
+  return { kind: "json", name: config.name, filePath: "<default>", config };
 }
+
+async function resolveAttachSource(
+  templateName: string | undefined,
+  coderTemplate: string,
+): Promise<{ source: TemplateSource; projectPath: string | null }> {
+  if (templateName === "default") {
+    return { source: buildDefaultSource(coderTemplate, "persistent"), projectPath: null };
+  }
+  if (templateName === "default-ephemeral") {
+    return { source: buildDefaultSource(coderTemplate, "ephemeral"), projectPath: null };
+  }
+  if (templateName) {
+    const resolved = await resolveTemplateSource({ name: templateName });
+    if (!resolved) {
+      p.log.error(`Template ${pc.bold(templateName)} not found`);
+      process.exit(1);
+    }
+    return { source: resolved.source, projectPath: resolved.projectPath };
+  }
+
+  const project = await getProjectTemplateSources();
+  const projectSources = project?.sources ?? [];
+  const globalSources = await listTemplateSources();
+
+  type PickerEntry = {
+    source: TemplateSource;
+    origin: "project" | "global" | "default";
+    defaultType?: "persistent" | "ephemeral";
+  };
+  const entries: PickerEntry[] = [
+    ...projectSources.map((s) => ({ source: s, origin: "project" as const })),
+    ...globalSources.map((s) => ({ source: s, origin: "global" as const })),
+    {
+      source: buildDefaultSource(coderTemplate, "persistent"),
+      origin: "default" as const,
+      defaultType: "persistent" as const,
+    },
+    {
+      source: buildDefaultSource(coderTemplate, "ephemeral"),
+      origin: "default" as const,
+      defaultType: "ephemeral" as const,
+    },
+  ];
+
+  entries.sort((a, b) => {
+    if (a.origin === "default" && b.origin === "default") {
+      return a.defaultType === "persistent" ? -1 : 1;
+    }
+    if (a.origin === "default") return 1;
+    if (b.origin === "default") return -1;
+    return a.source.name.localeCompare(b.source.name);
+  });
+
+  const choice = await p.autocomplete({
+    message: "Select a template",
+    options: entries.map((e) => {
+      const d = templateDisplay(e.source);
+      const projectTag = e.origin === "project" ? `  ${pc.dim("(project)")}` : "";
+      if (e.origin === "default") {
+        return {
+          value: e,
+          label: `${pc.bold(d.name)}  ${pc.dim("single pane")}  ${pc.dim(e.defaultType!)}`,
+        };
+      }
+      if (d.dynamic) {
+        return {
+          value: e,
+          label: `${pc.bold(d.name)}  ${pc.dim("(dynamic)")}${projectTag}`,
+        };
+      }
+      return {
+        value: e,
+        label: `${pc.bold(d.name)}  ${pc.dim(d.coderTemplate ?? "")}  ${pc.dim(d.type ?? "")}${projectTag}`,
+      };
+    }),
+    placeholder: "Type to filter",
+  });
+
+  if (p.isCancel(choice)) {
+    p.cancel("Cancelled.");
+    process.exit(0);
+  }
+
+  const picked = choice as PickerEntry;
+  return {
+    source: picked.source,
+    projectPath: picked.origin === "project" ? (project?.projectPath ?? null) : null,
+  };
+}
+

@@ -86,6 +86,21 @@ export async function startHeadlessSessions(
   return sessions;
 }
 
+/** Remove command/cwd from every terminal surface in a layout tree. Mutates in place. */
+export function stripCommands(node: LayoutNode): void {
+  if (isPaneNode(node)) {
+    for (const surface of node.pane.surfaces) {
+      if (surface.type === "terminal") {
+        delete surface.command;
+        delete surface.cwd;
+      }
+    }
+  } else if (isSplitNode(node)) {
+    stripCommands(node.children[0]);
+    stripCommands(node.children[1]);
+  }
+}
+
 /** Collect all terminal surfaces from a layout tree. */
 export function collectTerminalSurfaces(node: LayoutNode): SurfaceConfig[] {
   if (isPaneNode(node)) {

@@ -62,6 +62,70 @@ describe("saveLayout", () => {
     expect(layout.template).toBeNull();
     expect(layout.branch).toBeNull();
     expect(layout.path).toBeNull();
+    expect(layout.vars).toBeNull();
+  });
+
+  it("persists vars as JSON blob", () => {
+    saveLayout({
+      name: "with-vars",
+      cmux_id: "ws:1",
+      coder_ws: "my-ws",
+      vars: { branch: "main", port: 3000, browser: true, picks: ["a", "b"] },
+    });
+    const layout = getLayout("with-vars")!;
+    expect(layout.vars).not.toBeNull();
+    expect(JSON.parse(layout.vars!)).toEqual({
+      branch: "main",
+      port: 3000,
+      browser: true,
+      picks: ["a", "b"],
+    });
+  });
+
+  it("upsert overwrites vars", () => {
+    saveLayout({
+      name: "vs",
+      cmux_id: "ws:1",
+      coder_ws: "my-ws",
+      vars: { a: 1 },
+    });
+    saveLayout({
+      name: "vs",
+      cmux_id: "ws:1",
+      coder_ws: "my-ws",
+      vars: { b: 2 },
+    });
+    expect(JSON.parse(getLayout("vs")!.vars!)).toEqual({ b: 2 });
+  });
+
+  it("clears vars when passed null", () => {
+    saveLayout({
+      name: "c",
+      cmux_id: "ws:1",
+      coder_ws: "my-ws",
+      vars: { a: 1 },
+    });
+    saveLayout({
+      name: "c",
+      cmux_id: "ws:1",
+      coder_ws: "my-ws",
+      vars: null,
+    });
+    expect(getLayout("c")!.vars).toBeNull();
+  });
+});
+
+describe("updateLayout vars", () => {
+  it("serializes an object to JSON", () => {
+    saveLayout({ name: "u", cmux_id: "ws:1", coder_ws: "my-ws" });
+    updateLayout("u", { vars: { k: "v" } });
+    expect(JSON.parse(getLayout("u")!.vars!)).toEqual({ k: "v" });
+  });
+
+  it("accepts a pre-serialized JSON string", () => {
+    saveLayout({ name: "u", cmux_id: "ws:1", coder_ws: "my-ws" });
+    updateLayout("u", { vars: JSON.stringify({ k: 1 }) });
+    expect(JSON.parse(getLayout("u")!.vars!)).toEqual({ k: 1 });
   });
 });
 

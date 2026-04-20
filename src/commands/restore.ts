@@ -10,13 +10,16 @@ import {
   waitForWorkspace,
   ensureSshConfig,
   requireCoderLogin,
+  buildWorkspaceContext,
+  getCoderUrl,
 } from "../lib/coder.ts";
 import {
-  getTemplate,
+  getTemplateSource,
+  materializeTemplate,
   normalizeCommand,
   type TemplateConfig,
+  type TemplateSource,
 } from "../lib/templates.ts";
-import { parseVarsArg, resolveVariables } from "../lib/variables.ts";
 import {
   getAllLayouts,
   getLayout,
@@ -30,6 +33,7 @@ import {
   buildCmuxLayout,
   collectTerminalSurfaces,
   startPortForwarding,
+  stripCommands,
 } from "../lib/layout-builder.ts";
 import { sshHost } from "../lib/ssh.ts";
 import { fuzzyMatch, pickLayout } from "../lib/workspace-picker.ts";
@@ -50,10 +54,6 @@ export const restoreCommand = defineCommand({
       alias: "n",
       description: "Show what would be restored without doing it",
       default: false,
-    },
-    vars: {
-      type: "string",
-      description: "Template variables as key=value pairs (e.g. --vars \"branch=main,port=3000\")",
     },
   },
   async run({ args }) {
@@ -83,8 +83,7 @@ export const restoreCommand = defineCommand({
     await ensureSshConfig();
     sshSpinner.stop("SSH config updated");
 
-    const cliVars = args.vars ? parseVarsArg(args.vars as string) : {};
-    await restoreLayout(layout, cliVars);
+    await restoreLayout(layout);
 
     p.outro(`${pc.green("✓")} Restored ${pc.bold(layout.name)}`);
   },
@@ -145,7 +144,7 @@ async function resolveLayout(
   return selected;
 }
 
-async function restoreLayout(layout: LayoutEntry, cliVars: Record<string, string> = {}): Promise<void> {
+async function restoreLayout(layout: LayoutEntry): Promise<void> {
   const spinner = p.spinner();
   spinner.start(`Restoring ${pc.bold(layout.name)}`);
 
@@ -169,21 +168,37 @@ async function restoreLayout(layout: LayoutEntry, cliVars: Record<string, string
   }
 
   // 2. Resolve template
-  const template = layout.template ? await getTemplate(layout.template) : null;
+  const source = layout.template ? await getTemplateSource(layout.template) : null;
 
-  const effectiveTemplate: TemplateConfig = template ?? {
+  const fallbackConfig: TemplateConfig = {
     name: "default",
     coder: { template: coder.template_name },
     type: layout.type,
     layout: { pane: { surfaces: [{ type: "terminal" }] } },
   };
 
-  if (!template) {
+  const effectiveSource: TemplateSource = source ?? {
+    kind: "json",
+    name: "default",
+    filePath: "<default>",
+    config: fallbackConfig,
+  };
+
+  if (!source && layout.template) {
     p.log.warn(`Template "${layout.template}" not found — using default single-pane`);
   }
 
-  // Resolve template variables
-  await resolveVariables(effectiveTemplate, cliVars);
+  const persistedVars = layout.vars ? (JSON.parse(layout.vars) as Record<string, unknown>) : undefined;
+
+  // Restore never prompts and never re-runs commands — rebuild the layout shape
+  // from persisted state, then strip commands so existing ZMX sessions are reattached
+  // without re-executing their original commands.
+  const { template: effectiveTemplate } = await materializeTemplate(effectiveSource, {
+    persistedVars,
+    interactive: false,
+    workspaceFactory: async () => buildWorkspaceContext(coder, await getCoderUrl()),
+  });
+  stripCommands(effectiveTemplate.layout);
 
   // 3. Probe remote for live ZMX sessions
   const storedSessions = getSessionsForLayout(layout.name);

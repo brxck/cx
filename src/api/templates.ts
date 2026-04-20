@@ -1,24 +1,55 @@
-import { listTemplatesAsync, getProjectTemplates } from "../lib/templates.ts";
+import {
+  listTemplateSources,
+  getProjectTemplateSources,
+  templateDisplay,
+  type TemplateSource,
+} from "../lib/templates.ts";
+
+function sourceToApiShape(source: TemplateSource, origin: "project" | "global") {
+  const d = templateDisplay(source);
+  const base = {
+    name: d.name,
+    kind: source.kind,
+    type: d.type ?? null,
+    coderTemplate: d.coderTemplate ?? null,
+    color: d.color ?? null,
+    dynamic: d.dynamic,
+    source: origin,
+  };
+  if (source.kind === "json") {
+    // Include full config for legacy consumers — layout, ports, variables, parameters.
+    return {
+      ...base,
+      coder: source.config.coder,
+      ports: source.config.ports ?? null,
+      variables: source.config.variables ?? null,
+      layout: source.config.layout,
+    };
+  }
+  // JS templates: only publish static meta fields; do not execute the default fn.
+  return {
+    ...base,
+    coder: source.meta?.coder ?? null,
+    description: source.meta?.description ?? null,
+  };
+}
 
 export async function handleTemplates(): Promise<Response> {
-  const [globalTemplates, project] = await Promise.all([
-    listTemplatesAsync(),
-    getProjectTemplates(),
+  const [globalSources, project] = await Promise.all([
+    listTemplateSources(),
+    getProjectTemplateSources(),
   ]);
+  const projectSources = project?.sources ?? [];
 
-  const projectTemplates = project?.templates ?? [];
-
-  // Merge and dedupe (project-local first)
   const seen = new Set<string>();
-  const templates = [];
-  for (const t of projectTemplates) {
-    seen.add(t.name);
-    templates.push({ ...t, source: "project" as const });
+  const templates: ReturnType<typeof sourceToApiShape>[] = [];
+  for (const s of projectSources) {
+    seen.add(s.name);
+    templates.push(sourceToApiShape(s, "project"));
   }
-  for (const t of globalTemplates) {
-    if (!seen.has(t.name)) {
-      templates.push({ ...t, source: "global" as const });
-    }
+  for (const s of globalSources) {
+    if (seen.has(s.name)) continue;
+    templates.push(sourceToApiShape(s, "global"));
   }
 
   return Response.json({ templates });

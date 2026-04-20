@@ -60,14 +60,18 @@ export function parseVarsArg(varsArg: string): Record<string, string> {
 /**
  * Resolve all template variables and substitute them in place.
  * Priority: CLI args > template defaults > interactive prompt.
+ *
+ * When `interactive` is false, missing variables without defaults throw instead of prompting.
  */
 export async function resolveVariables(
   template: TemplateConfig,
   cliVars: Record<string, string>,
+  opts: { interactive?: boolean } = {},
 ): Promise<void> {
   const varNames = extractVariables(template);
   if (varNames.length === 0) return;
 
+  const interactive = opts.interactive !== false;
   const resolved: Record<string, string> = {};
 
   for (const name of varNames) {
@@ -75,6 +79,10 @@ export async function resolveVariables(
       resolved[name] = cliVars[name]!;
     } else if (template.variables?.[name]?.default !== undefined) {
       resolved[name] = template.variables[name]!.default!;
+    } else if (!interactive) {
+      throw new Error(
+        `Template variable "{{${name}}}" has no CLI or default value — cannot prompt in non-interactive mode`,
+      );
     } else {
       const desc = template.variables?.[name]?.description;
       const value = await p.text({

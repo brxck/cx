@@ -49,6 +49,11 @@ function migrate(db: Database): void {
     db.exec("ALTER TABLE layouts ADD COLUMN ssh_mode INTEGER NOT NULL DEFAULT 0");
     db.exec("PRAGMA user_version = 3");
   }
+
+  if (version < 4) {
+    db.exec("ALTER TABLE layouts ADD COLUMN vars TEXT");
+    db.exec("PRAGMA user_version = 4");
+  }
 }
 
 export function getDb(): Database {
@@ -85,6 +90,7 @@ export interface LayoutEntry {
   type: LayoutType;
   branch: string | null;
   path: string | null;
+  vars: string | null;
   created_at: string;
   active_at: string;
 }
@@ -125,13 +131,15 @@ export function saveLayout(entry: {
   type?: LayoutType;
   branch?: string | null;
   path?: string | null;
+  vars?: Record<string, unknown> | null;
 }): void {
+  const varsJson = entry.vars == null ? null : JSON.stringify(entry.vars);
   getDb()
     .query(
-      `INSERT INTO layouts (name, cmux_id, coder_ws, template, type, branch, path)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+      `INSERT INTO layouts (name, cmux_id, coder_ws, template, type, branch, path, vars)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
        ON CONFLICT(name) DO UPDATE SET
-         cmux_id = ?2, coder_ws = ?3, template = ?4, type = ?5, branch = ?6, path = ?7,
+         cmux_id = ?2, coder_ws = ?3, template = ?4, type = ?5, branch = ?6, path = ?7, vars = ?8,
          active_at = datetime('now')`
     )
     .run(
@@ -142,17 +150,31 @@ export function saveLayout(entry: {
       entry.type ?? "persistent",
       entry.branch ?? null,
       entry.path ?? null,
+      varsJson,
     );
 }
 
-export function updateLayout(name: string, updates: Partial<Omit<LayoutEntry, "name">>): void {
+export function updateLayout(
+  name: string,
+  updates: Partial<Omit<LayoutEntry, "name" | "vars">> & { vars?: Record<string, unknown> | string | null },
+): void {
   const fields: string[] = [];
   const values: (string | number | null)[] = [];
 
   for (const [key, value] of Object.entries(updates)) {
     if (key === "name") continue;
     fields.push(`${key} = ?`);
-    values.push(value as string | number | null);
+    if (key === "vars") {
+      if (value == null) {
+        values.push(null);
+      } else if (typeof value === "string") {
+        values.push(value);
+      } else {
+        values.push(JSON.stringify(value));
+      }
+    } else {
+      values.push(value as string | number | null);
+    }
   }
 
   if (fields.length === 0) return;
