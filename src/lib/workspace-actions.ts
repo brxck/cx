@@ -24,6 +24,7 @@ import { runAttach } from "../commands/attach.ts";
 import { runActivate } from "../commands/activate.ts";
 import { runDetach } from "../commands/detach.ts";
 import { runDown } from "../commands/down.ts";
+import { runDelete } from "../commands/delete.ts";
 
 export type ActionGroup = "navigation" | "interact" | "lifecycle" | "layout";
 
@@ -215,6 +216,16 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
         await printCoderFailure(err, { workspace: ws.name });
         throw err;
       }
+    },
+  },
+  {
+    id: "delete",
+    label: "Delete workspace",
+    group: "lifecycle",
+    hint: () => "permanent — removes all layouts",
+    isAvailable: () => true,
+    async run({ ws, layouts }) {
+      await runDelete({ ws, layouts });
     },
   },
 

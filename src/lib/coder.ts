@@ -437,6 +437,17 @@ export async function restartWorkspace(name: string, opts?: LogStreamOpts): Prom
   if (code !== 0) throw new CoderCommandError("restart", code, tail);
 }
 
+/** Delete a Coder workspace. */
+export async function deleteWorkspace(
+  name: string,
+  opts?: { orphan?: boolean } & LogStreamOpts,
+): Promise<void> {
+  const args = ["coder", "delete", name, "-y"];
+  if (opts?.orphan) args.push("--orphan");
+  const { code, tail } = await runCoderProcess(args, opts);
+  if (code !== 0) throw new CoderCommandError("delete", code, tail);
+}
+
 /** SSH into a workspace (replaces the current process). */
 export async function sshIntoWorkspace(workspaceName: string, session?: string): Promise<void> {
   const host = session ? `${workspaceName}.${session}` : workspaceName;

@@ -4,6 +4,7 @@ import pc from "picocolors";
 import { version } from "../package.json";
 import { upCommand } from "./commands/up.ts";
 import { downCommand } from "./commands/down.ts";
+import { deleteCommand } from "./commands/delete.ts";
 import { attachCommand } from "./commands/attach.ts";
 import { detachCommand } from "./commands/detach.ts";
 import { statusCommand } from "./commands/status.ts";
@@ -24,7 +25,7 @@ import { serveCommand } from "./commands/serve.ts";
 const commandGroups = [
   {
     label: "Lifecycle",
-    commands: ["up", "down", "attach", "detach", "restart", "update"],
+    commands: ["up", "down", "attach", "detach", "restart", "update", "delete"],
   },
   {
     label: "Navigation",
@@ -67,6 +68,7 @@ const main = defineCommand({
     logs: logsCommand,
     update: updateCommand,
     restart: restartCommand,
+    delete: deleteCommand,
     init: initCommand,
     serve: serveCommand,
   },
