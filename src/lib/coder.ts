@@ -193,11 +193,15 @@ async function runCoderProcess(
   return { code, tail };
 }
 
-/** Create a new Coder workspace. Streams build logs through opts.onLine (defaults to stderr). */
+/**
+ * Create a new Coder workspace. Runs with inherited stdio so the user can answer
+ * prompts for required parameters that have no default and aren't covered by the
+ * preset — piping stdin would cause `coder create` to fail with "prepare build: EOF".
+ */
 export async function createWorkspace(
   name: string,
   template: string,
-  opts?: { params?: Record<string, string>; preset?: string } & LogStreamOpts,
+  opts?: { params?: Record<string, string>; preset?: string },
 ): Promise<void> {
   const args = ["coder", "create", "-t", template, name, "-y", "--use-parameter-defaults"];
   if (opts?.preset) {
@@ -208,8 +212,13 @@ export async function createWorkspace(
       args.push("--parameter", `${key}=${value}`);
     }
   }
-  const { code, tail } = await runCoderProcess(args, opts);
-  if (code !== 0) throw new CoderCommandError("create", code, tail);
+  const proc = Bun.spawn(args, {
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const code = await proc.exited;
+  if (code !== 0) throw new CoderCommandError("create", code, []);
 }
 
 /** Stop a running Coder workspace. */

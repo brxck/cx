@@ -175,15 +175,13 @@ async function ensureCoderWorkspace(
 
   try {
     if (!existing) {
-      const heading = `Creating ${pc.bold(name)}`;
-      spinner.message(heading);
+      spinner.stop(`Creating ${pc.bold(name)}`);
       await createWorkspace(name, coder.template, {
         params: coder.parameters,
         preset: coder.preset,
-        onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
       });
       const waitHeading = `Waiting for ${pc.bold(name)}`;
-      spinner.message(waitHeading);
+      spinner.start(waitHeading);
       await waitForWorkspace(name, undefined, (line) =>
         spinner.message(formatLogForSpinner(waitHeading, line)),
       );
