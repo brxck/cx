@@ -229,6 +229,14 @@ We use `coder config-ssh` to generate standard OpenSSH config entries in `~/.ssh
 
 This enables **remote Cmux control** — an AI agent running on the remote workspace can send commands back to the local Cmux socket.
 
+### Opting out of `cmux ssh`
+
+By default `cx` builds layouts on top of Cmux's managed SSH workspace (`cmux ssh <host>`), which tracks connection state and shows reconnect UI in Cmux. Set `"cmuxSsh": false` in `~/.config/cx/config.json` to skip that integration: `cx` will instead create a plain Cmux workspace and SSH directly in each terminal pane.
+
+In this mode each pane SSHes to the *session-suffixed* host (`{agent}.{workspace}.{user}.coder.{session}`) through `autossh -M 0` with `ServerAliveInterval=15` + `ServerAliveCountMax=3`. Drops are detected by OpenSSH keepalives within ~45s and autossh reconnects automatically; because the host has a session suffix, the ZMX SSH Match block runs `RemoteCommand zmx attach <session>` on every (re)connect — no extra keystrokes needed to restore the session. `AUTOSSH_GATETIME=0` disables autossh's first-dial gate so a briefly-flaky workspace still reconnects. If `autossh` is missing from `PATH`, panes fall back to plain `ssh` (with a one-time warning about `brew install autossh`) — session hostnames still trigger attach, just without auto-reconnect on drop.
+
+The tradeoff is that Cmux no longer tracks SSH connection state — each pane SSHs independently, so there is no centralized reconnect indicator, but transient `cmux ssh` flakiness is avoided and exiting SSH in one pane does not affect the others.
+
 ### Remote Cmux Socket Forwarding
 
 Terminal surfaces in generated Cmux commands include `-R /tmp/cmux.sock:$CMUX_SOCKET_PATH` to forward the local Cmux socket to the remote. On the remote side, any process writing to `/tmp/cmux.sock` talks to the local Cmux instance.
@@ -255,6 +263,8 @@ ZMX is a terminal session multiplexer running on the remote Coder workspace. It 
 ### SSH Integration
 
 ZMX integrates with SSH via `RemoteCommand zmx attach %k` in the SSH config. When connecting to `coder.workspace.session`, SSH runs `zmx attach session` on the remote, creating or attaching to the named ZMX session. This is how `coder config-ssh` works with session names.
+
+In `cmuxSsh: false` mode, every pane SSHes directly to the session-suffixed host, so the session hostname *is* the attach trigger. Combined with `autossh` keepalives (see [Opting out of `cmux ssh`](#opting-out-of-cmux-ssh)), a dropped connection reconnects automatically and re-runs `RemoteCommand`, re-attaching the ZMX session with no extra keystrokes.
 
 ### Session Tracking
 

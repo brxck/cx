@@ -13,11 +13,21 @@ import {
 import { consola } from "consola";
 import { generateSessionName } from "./session-names.ts";
 import { getSessions } from "./store.ts";
-import { sshHost } from "./ssh.ts";
+import { buildInteractiveSshCommand, sshHost, sshHostWithSession } from "./ssh.ts";
+import { loadConfig } from "./config.ts";
 
 export interface BuiltLayout {
   cmuxRef: string;
   sessions: Array<{ name: string; command?: string }>;
+}
+
+interface SshContext {
+  useCmuxSsh: boolean;
+  host: string;
+}
+
+async function interactiveSshForSession(coderWs: string, session: string): Promise<string> {
+  return buildInteractiveSshCommand(await sshHostWithSession(coderWs, session));
 }
 
 /**
@@ -38,21 +48,40 @@ export async function buildCmuxLayout(
   assignSessionNames(template.layout, existingSessions);
 
   const host = await sshHost(coderWsName);
-  const { workspace: wsRef } = await cmux.ssh(host, { name: layoutName });
+  const config = await loadConfig();
+  const useCmuxSsh = config.cmuxSsh !== false;
+  const sshCtx: SshContext = { useCmuxSsh, host };
+
+  let wsRef: string;
+  if (useCmuxSsh) {
+    wsRef = (await cmux.ssh(host, { name: layoutName })).workspace;
+  } else {
+    const initialSession = collectTerminalSurfaces(template.layout)[0]?.session;
+    if (initialSession) {
+      const initialCmd = await interactiveSshForSession(coderWsName, initialSession);
+      wsRef = await cmux.newWorkspace({ name: layoutName, command: initialCmd });
+    } else {
+      wsRef = await cmux.newWorkspace({ name: layoutName });
+    }
+  }
 
   if (template.color) {
     await cmux.setWorkspaceColor(wsRef, template.color);
   }
 
-  // Resolve the initial SSH surface (the single surface of the single pane).
+  // Resolve the initial surface (the single surface of the single pane).
   const panes = await cmux.listPanes(wsRef);
   const initialSurfRef = panes[0]?.surface_refs[0];
   if (!initialSurfRef) {
-    throw new Error(`New SSH workspace ${wsRef} has no initial surface`);
+    throw new Error(`New workspace ${wsRef} has no initial surface`);
+  }
+
+  if (!useCmuxSsh) {
+    await cmux.waitForPrompt(wsRef, initialSurfRef);
   }
 
   const sessions: Array<{ name: string; command?: string }> = [];
-  await walkLayout(template.layout, wsRef, coderWsName, initialSurfRef, sessions);
+  await walkLayout(template.layout, wsRef, coderWsName, initialSurfRef, sessions, sshCtx);
 
   spinner.stop(`Layout built — ${pc.cyan(wsRef)}`);
   return { cmuxRef: wsRef, sessions };
@@ -159,9 +188,10 @@ async function walkLayout(
   coderWs: string,
   surfRef: string,
   sessions: Array<{ name: string; command?: string }>,
+  sshCtx: SshContext,
 ): Promise<void> {
   if (isPaneNode(node)) {
-    await configureSurfaces(node, wsRef, surfRef, sessions);
+    await configureSurfaces(node, wsRef, surfRef, sessions, sshCtx, coderWs);
     return;
   }
 
@@ -175,8 +205,20 @@ async function walkLayout(
       direction,
     });
 
-    await walkLayout(node.children[0], wsRef, coderWs, surfRef, sessions);
-    await walkLayout(node.children[1], wsRef, coderWs, newSurfRef, sessions);
+    if (!sshCtx.useCmuxSsh) {
+      // Only SSH if the right subtree actually has a terminal surface that
+      // will land in this pane. Browser-only subtrees use newSurface to
+      // create their own surfaces, leaving the split's default terminal unused.
+      const rightSession = collectTerminalSurfaces(node.children[1])[0]?.session;
+      if (rightSession) {
+        const rightCmd = await interactiveSshForSession(coderWs, rightSession);
+        await cmux.send(`${rightCmd}\n`, { workspace: wsRef, surface: newSurfRef });
+        await cmux.waitForPrompt(wsRef, newSurfRef);
+      }
+    }
+
+    await walkLayout(node.children[0], wsRef, coderWs, surfRef, sessions, sshCtx);
+    await walkLayout(node.children[1], wsRef, coderWs, newSurfRef, sessions, sshCtx);
   }
 }
 
@@ -185,6 +227,8 @@ async function configureSurfaces(
   wsRef: string,
   surfRef: string,
   sessions: Array<{ name: string; command?: string }>,
+  sshCtx: SshContext,
+  coderWs: string,
 ): Promise<void> {
   const surfaces = node.pane.surfaces;
 
@@ -212,22 +256,26 @@ async function configureSurfaces(
           workspace: wsRef,
           type: "terminal",
         });
+        if (!sshCtx.useCmuxSsh) {
+          const sshCmd = await interactiveSshForSession(coderWs, surface.session!);
+          await cmux.send(`${sshCmd}\n`, { workspace: wsRef, surface: targetSurf });
+          await cmux.waitForPrompt(wsRef, targetSurf);
+        }
       }
 
       const sendOpts = { workspace: wsRef, surface: targetSurf };
 
-      // Attach to session first, then run the command separately.
-      // Using `zmx attach session -- cmd` replaces the shell, so if cmd
-      // exits the session dies. Sending the command after attach keeps
-      // an interactive shell underneath.
-      if (surface.session) {
+      // With cmuxSsh: false, SSH already targets the session-suffixed host so
+      // RemoteCommand attaches zmx on every (re)connect. For the managed
+      // cmux ssh path, attach explicitly since the host is session-less.
+      if (sshCtx.useCmuxSsh && surface.session) {
         await cmux.send(`zmx attach ${surface.session}\n`, sendOpts);
         if (cmd) {
-          // Wait for the zmx session prompt before sending the command.
           await cmux.waitForPrompt(wsRef, targetSurf);
-          await cmux.send(`${cmd}\n`, sendOpts);
         }
-      } else if (cmd) {
+      }
+
+      if (cmd) {
         await cmux.send(`${cmd}\n`, sendOpts);
       }
 

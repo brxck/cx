@@ -8,6 +8,7 @@ const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 export interface Config {
   username: string;
   agent?: string;
+  cmuxSsh?: boolean;
 }
 
 export async function loadConfig(): Promise<Config> {
