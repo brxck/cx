@@ -231,7 +231,7 @@ export async function startWorkspace(name: string, opts?: LogStreamOpts): Promis
  */
 export async function waitForWorkspace(
   name: string,
-  timeoutMs = 5 * 60 * 1000,
+  timeoutMs = 15 * 60 * 1000,
   onLog?: (line: string) => void,
 ): Promise<void> {
   const tail: string[] = [];
