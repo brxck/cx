@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdirSync, readdirSync, unlinkSync, existsSync, statSync } from "node:fs";
+import consola from "consola";
 import type { InputHelpers, ResolvedInputs } from "./input.ts";
 import { createInputHelpers } from "./input.ts";
 import type { WorkspaceContext } from "./coder.ts";
@@ -247,7 +248,7 @@ async function listSourcesInDir(dir: string): Promise<TemplateSource[]> {
       seen.add(src.name);
       sources.push(src);
     } catch (err) {
-      throw new Error((err as Error).message);
+      consola.warn(`Skipping invalid template: ${(err as Error).message}`);
     }
   }
   return sources;
