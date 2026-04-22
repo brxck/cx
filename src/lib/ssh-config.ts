@@ -5,7 +5,7 @@ const SSH_CONFIG = join(homedir(), ".ssh", "config");
 const START_MARKER = "# --- START ZMX ---";
 const END_MARKER = "LogLevel ERROR";
 
-function zmxBlock(coderPath: string): string {
+export function zmxBlock(coderPath: string): string {
   return `# --- START ZMX ---
 # SSH config for Coder workspaces with ZMX session persistence.
 #
@@ -24,7 +24,7 @@ function zmxBlock(coderPath: string): string {
 
 # Plain Coder SSH — no ZMX, clean shell (used by cmux ssh, direct connections)
 Match host *.coder,!coder-vscode.*
-    ProxyCommand bash -c 'ws=$(echo %h | sed "s/^[^.]*\\.\\([^.]*\\).*/\\1/"); exec ${coderPath} ssh --stdio --ssh-host-prefix coder. "coder.$ws"'
+    ProxyCommand ${coderPath} ssh --stdio --hostname-suffix coder %h
     ControlPath ~/.ssh/cm-%r@%h:%p
     ControlMaster auto
     ControlPersist 10m
@@ -35,7 +35,7 @@ Match host *.coder,!coder-vscode.*
 
 # ZMX session persistence — host has a session name suffix after .coder.
 Match host *.coder.*,!coder-vscode.*
-    ProxyCommand bash -c 'ws=$(echo %h | sed "s/^[^.]*\\.\\([^.]*\\).*/\\1/"); exec ${coderPath} ssh --stdio --ssh-host-prefix coder. "coder.$ws"'
+    ProxyCommand bash -c 'h=%h; exec ${coderPath} ssh --stdio --hostname-suffix coder "\${h%%.*}"'
     RemoteCommand session=%k; zmx attach "$(echo $session | sed 's/.*\\.//')"
     RequestTTY yes
     ControlPath ~/.ssh/cm-%r@%h:%p
@@ -67,12 +67,50 @@ export async function hasZmxBlock(): Promise<boolean> {
   return content.includes(START_MARKER);
 }
 
+export type MergeResult =
+  | { action: "noop" }
+  | { action: "inserted"; content: string }
+  | { action: "updated"; content: string };
+
+/**
+ * Pure merge: given the current ssh_config contents and the canonical ZMX block,
+ * return the new contents (or noop if already current).
+ *
+ * Update path owns the whole ZMX region from START_MARKER through the last
+ * `LogLevel ERROR` before the Coder-managed section (or EOF). Any number of
+ * historical Match blocks in that region collapse back to the canonical template.
+ */
+export function mergeZmxBlock(content: string, block: string): MergeResult {
+  if (content.includes(START_MARKER)) {
+    const startIdx = content.indexOf(START_MARKER);
+    const coderIdx = content.indexOf(CODER_MARKER, startIdx);
+    const regionEnd = coderIdx === -1 ? content.length : coderIdx;
+    const lastEnd = content.lastIndexOf(END_MARKER, regionEnd);
+    if (lastEnd === -1 || lastEnd < startIdx) return { action: "noop" };
+    const endIdx = lastEnd + END_MARKER.length;
+
+    const existingBlock = content.slice(startIdx, endIdx);
+    if (existingBlock === block) return { action: "noop" };
+
+    const before = content.slice(0, startIdx);
+    const after = content.slice(endIdx);
+    return { action: "updated", content: before + block + after };
+  }
+
+  const coderIndex = content.indexOf(CODER_MARKER);
+  if (coderIndex !== -1) {
+    const before = content.slice(0, coderIndex);
+    const after = content.slice(coderIndex);
+    return { action: "inserted", content: before + block + "\n\n" + after };
+  }
+  return { action: "inserted", content: block + "\n\n" + content };
+}
+
 /**
  * Idempotently insert or update the ZMX Match blocks in ~/.ssh/config.
  * Returns "inserted" if added fresh, "updated" if replaced an older version, or false if already current.
  */
 export async function ensureZmxBlock(): Promise<"inserted" | "updated" | false> {
-  // Ensure ~/.ssh exists
   const sshDir = join(homedir(), ".ssh");
   await Bun.$`mkdir -p ${sshDir}`.quiet();
 
@@ -83,44 +121,8 @@ export async function ensureZmxBlock(): Promise<"inserted" | "updated" | false> 
   const exists = await file.exists();
   const content = exists ? await file.text() : "";
 
-  if (content.includes(START_MARKER)) {
-    // Block exists — check if it needs updating
-    const startIdx = content.indexOf(START_MARKER);
-    // Find the last END_MARKER after the start marker (end of the last Match block)
-    const afterStart = content.indexOf(END_MARKER, startIdx);
-    if (afterStart === -1) return false;
-    // There may be two Match blocks; find the final END_MARKER
-    let endIdx = afterStart;
-    const searchFrom = afterStart + END_MARKER.length;
-    const nextMarkerOrCoder = content.indexOf("\n#", searchFrom);
-    const nextEnd = content.indexOf(END_MARKER, searchFrom);
-    if (nextEnd !== -1 && (nextMarkerOrCoder === -1 || nextEnd < nextMarkerOrCoder)) {
-      endIdx = nextEnd;
-    }
-    const existingBlock = content.slice(startIdx, endIdx + END_MARKER.length);
-    if (existingBlock === block) return false;
-
-    // Replace the old block
-    const before = content.slice(0, startIdx);
-    const after = content.slice(endIdx + END_MARKER.length);
-    await Bun.write(SSH_CONFIG, before + block + after);
-    return "updated";
-  }
-
-  // Fresh insert
-  let result: string;
-  const coderIndex = content.indexOf(CODER_MARKER);
-
-  if (coderIndex !== -1) {
-    // Insert before the Coder-managed section
-    const before = content.slice(0, coderIndex);
-    const after = content.slice(coderIndex);
-    result = before + block + "\n\n" + after;
-  } else {
-    // No Coder section — prepend
-    result = block + "\n\n" + content;
-  }
-
-  await Bun.write(SSH_CONFIG, result);
-  return "inserted";
+  const result = mergeZmxBlock(content, block);
+  if (result.action === "noop") return false;
+  await Bun.write(SSH_CONFIG, result.content);
+  return result.action;
 }
