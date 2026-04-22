@@ -9,10 +9,13 @@ export function formatLogForSpinner(heading: string, line: string): string {
   const clean = line.replace(ANSI_RE, "").replace(/\s+/g, " ").trim();
   if (!clean) return heading;
   const cols = process.stdout.columns || 80;
-  // Reserve room for clack's spinner prefix (~4 chars) plus the heading and separator.
+  // Clack's spinner wraps the full frame `<char>  <msg><dots>` to the terminal
+  // width but clears based only on the bare message, so wrapped frames leak.
+  // Reserve: spinner char (1) + two spaces (2) + trailing dots up to 3 (3) +
+  // our " · " separator (3) + a 1-char safety margin = 10.
   const headingVisible = heading.replace(ANSI_RE, "");
-  const reserved = headingVisible.length + 5;
-  const max = Math.max(20, cols - reserved);
+  const reserved = headingVisible.length + 10;
+  const max = Math.max(10, cols - reserved);
   const trimmed = clean.length <= max ? clean : clean.slice(0, max - 1) + "…";
   return `${heading} ${pc.dim("·")} ${pc.dim(trimmed)}`;
 }
