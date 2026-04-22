@@ -209,7 +209,9 @@ export async function createWorkspace(
   }
   if (opts?.params) {
     for (const [key, value] of Object.entries(opts.params)) {
-      args.push("--parameter", `${key}=${value}`);
+      const pair = `${key}=${value}`;
+      const escaped = /[",\n\r]/.test(pair) ? `"${pair.replace(/"/g, '""')}"` : pair;
+      args.push("--parameter", escaped);
     }
   }
   const proc = Bun.spawn(args, {
