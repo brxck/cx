@@ -32,7 +32,6 @@ Read these before making changes.
 - `src/lib/templates.ts` — template types, load/save, per-project discovery, cmux.json generation
 - `src/lib/coder.ts` — Coder CLI wrapper (list, create, start, stop, wait, SSH, config-ssh)
 - `src/lib/workspace-picker.ts` — shared interactive workspace picker
-- `src/lib/session-names.ts` — PNW town name generator for SSH sessions
 - `bin/cli.ts` — shebang entrypoint
 
 ## Scripts

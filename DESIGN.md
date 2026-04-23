@@ -284,7 +284,7 @@ Every terminal surface in a layout gets a named ZMX session. Session names are s
 1. Create/start Coder workspace (same as normal `up`)
 2. Ensure SSH config
 3. For each terminal surface in the template:
-   - Generate a session name (from `session-names.ts` or the surface's `session` field)
+   - Read the surface's `session` field (required)
    - SSH into the workspace and run `zmx run {session} {command}` to start a detached session
    - Record the session in the store
 4. Start port forwarding (if template has ports)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { collectTerminalSurfaces, assignSessionNames } from "./layout-builder.ts";
+import { collectTerminalSurfaces, validateSessionNames } from "./layout-builder.ts";
 import type { LayoutNode, SurfaceConfig } from "./templates.ts";
 
 describe("collectTerminalSurfaces", () => {
@@ -58,37 +58,38 @@ describe("collectTerminalSurfaces", () => {
   });
 });
 
-describe("assignSessionNames", () => {
-  it("assigns names to surfaces without a session", () => {
+describe("validateSessionNames", () => {
+  it("passes when every terminal surface has a session", () => {
     const node: LayoutNode = {
       direction: "horizontal",
       children: [
-        { pane: { surfaces: [{ type: "terminal" }] } },
+        { pane: { surfaces: [{ type: "terminal", session: "a" }] } },
+        { pane: { surfaces: [{ type: "terminal", session: "b" }] } },
+      ],
+    };
+    expect(() => validateSessionNames(node)).not.toThrow();
+  });
+
+  it("throws when a terminal surface lacks a session", () => {
+    const node: LayoutNode = {
+      direction: "horizontal",
+      children: [
+        { pane: { surfaces: [{ type: "terminal", session: "a" }] } },
         { pane: { surfaces: [{ type: "terminal" }] } },
       ],
     };
-    assignSessionNames(node, []);
-    const terminals = collectTerminalSurfaces(node);
-    expect(terminals[0]!.session).toBeDefined();
-    expect(terminals[1]!.session).toBeDefined();
-    expect(terminals[0]!.session).not.toBe(terminals[1]!.session);
+    expect(() => validateSessionNames(node)).toThrow(/session/);
   });
 
-  it("does not overwrite existing session names", () => {
+  it("ignores browser surfaces", () => {
     const node: LayoutNode = {
-      pane: { surfaces: [{ type: "terminal", session: "custom" }] },
+      pane: {
+        surfaces: [
+          { type: "browser", url: "http://localhost:3000" },
+          { type: "terminal", session: "a" },
+        ],
+      },
     };
-    assignSessionNames(node, []);
-    const terminals = collectTerminalSurfaces(node);
-    expect(terminals[0]!.session).toBe("custom");
-  });
-
-  it("avoids existing session names", () => {
-    const node: LayoutNode = {
-      pane: { surfaces: [{ type: "terminal" }] },
-    };
-    assignSessionNames(node, ["anacortes"]);
-    const terminals = collectTerminalSurfaces(node);
-    expect(terminals[0]!.session).not.toBe("anacortes");
+    expect(() => validateSessionNames(node)).not.toThrow();
   });
 });

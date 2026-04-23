@@ -9,7 +9,6 @@ import {
 } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 import { getSessions, recordSession } from "../lib/store.ts";
-import { generateSessionName } from "../lib/session-names.ts";
 
 export interface RunSshOpts {
   ws: CoderWorkspace;
@@ -23,17 +22,15 @@ export async function runSsh(opts: RunSshOpts): Promise<void> {
   const noSession = opts.noSession ?? false;
 
   if (!session && !noSession) {
-    const previous = await getSessions(ws.name);
-    const suggested = generateSessionName(previous);
-    const CUSTOM = "__custom__";
+    const previous = getSessions(ws.name);
+    const NEW = "__new__";
     const NONE = "__none__";
 
     const choice = await p.autocomplete({
       message: "Session",
       options: [
-        { value: suggested, label: suggested, hint: "new session" },
-        { value: CUSTOM, label: "Custom name...", hint: "enter a name" },
         ...previous.map((s) => ({ value: s, label: s })),
+        { value: NEW, label: "New session...", hint: "enter a name" },
         { value: NONE, label: pc.dim("No session"), hint: "plain SSH" },
       ],
       placeholder: "Type to filter",
@@ -43,7 +40,7 @@ export async function runSsh(opts: RunSshOpts): Promise<void> {
       process.exit(0);
     }
 
-    if (choice === CUSTOM) {
+    if (choice === NEW) {
       const name = await p.text({
         message: "Session name",
       });

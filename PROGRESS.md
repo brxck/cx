@@ -53,14 +53,13 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `src/lib/cmux.ts` | Cmux CLI wrapper: workspace/pane/surface CRUD, input, notifications, sidebar state with `SidebarState`/`parseSidebarState`, list-workspaces parsing |
 | `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
 | `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions, v2 schema |
-| `src/lib/layout-builder.ts` | Shared layout building: `buildCmuxLayout()` (tree walker + Cmux workspace creation, returns sessions), `startHeadlessSessions()`, `collectTerminalSurfaces()`, `assignSessionNames()`, `startPortForwarding()` |
+| `src/lib/layout-builder.ts` | Shared layout building: `buildCmuxLayout()` (tree walker + Cmux workspace creation, returns sessions), `startHeadlessSessions()`, `collectTerminalSurfaces()`, `validateSessionNames()`, `startPortForwarding()` |
 | `src/lib/ports.ts` | Port-forward process detection (`detectPortForwards`, `detectPortForwardMap`) and killing (`stopPortForwards`) |
 | `src/lib/config.ts` | Config load/save for `~/.config/cx/config.json` (username, agent) |
 | `src/lib/ssh.ts` | Centralized SSH host construction using config — `sshHost()`, `sshHostWithSession()` |
 | `src/lib/ssh-config.ts` | ZMX SSH config management — `hasZmxBlock()`, `ensureZmxBlock()` for idempotent `~/.ssh/config` modification |
 | `src/lib/coder.ts` | Coder CLI wrapper: list, create, start, stop, wait, SSH, config-ssh, dashboard URLs, exec, VS Code open, log streaming, `listOpenableApps()`, `openWorkspaceApp()` |
 | `src/lib/workspace-picker.ts` | Shared interactive Coder workspace picker and layout picker (`pickLayout`) with fuzzy matching and status badges |
-| `src/lib/session-names.ts` | Generates session names from PNW town names, avoiding duplicates |
 
 ## Infrastructure
 

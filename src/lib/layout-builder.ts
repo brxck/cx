@@ -11,8 +11,6 @@ import {
   type SurfaceConfig,
 } from "./templates.ts";
 import { consola } from "consola";
-import { generateSessionName } from "./session-names.ts";
-import { getSessions } from "./store.ts";
 import { buildInteractiveSshCommand, sshHost, sshHostWithSession } from "./ssh.ts";
 import { loadConfig } from "./config.ts";
 
@@ -44,8 +42,7 @@ export async function buildCmuxLayout(
   const spinner = p.spinner();
   spinner.start("Building layout");
 
-  const existingSessions = getSessions(coderWsName);
-  assignSessionNames(template.layout, existingSessions);
+  validateSessionNames(template.layout);
 
   const host = await sshHost(coderWsName);
   const config = await loadConfig();
@@ -97,8 +94,7 @@ export async function startHeadlessSessions(
   const spinner = p.spinner();
   spinner.start("Starting headless ZMX sessions");
 
-  const existingSessions = getSessions(coderWsName);
-  assignSessionNames(template.layout, existingSessions);
+  validateSessionNames(template.layout);
 
   const surfaces = collectTerminalSurfaces(template.layout);
   const sessions: Array<{ name: string; command?: string }> = [];
@@ -145,16 +141,13 @@ export function collectTerminalSurfaces(node: LayoutNode): SurfaceConfig[] {
 }
 
 /**
- * Walk a layout tree and assign session names to terminal surfaces that lack one.
- * Mutates the tree in place.
+ * Ensure every terminal surface in a layout tree has a `session` name.
+ * Throws a descriptive error if any are missing.
  */
-export function assignSessionNames(node: LayoutNode, existingSessions: string[]): void {
-  const assigned = [...existingSessions];
-  const terminals = collectTerminalSurfaces(node);
-  for (const surface of terminals) {
+export function validateSessionNames(node: LayoutNode): void {
+  for (const surface of collectTerminalSurfaces(node)) {
     if (!surface.session) {
-      surface.session = generateSessionName(assigned);
-      assigned.push(surface.session);
+      throw new Error("Every terminal surface in a template must specify `session`.");
     }
   }
 }
