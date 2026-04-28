@@ -54,6 +54,22 @@ function migrate(db: Database): void {
     db.exec("ALTER TABLE layouts ADD COLUMN vars TEXT");
     db.exec("PRAGMA user_version = 4");
   }
+
+  if (version < 5) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS workspace_cache (
+        name       TEXT PRIMARY KEY,
+        json       TEXT NOT NULL,
+        cached_at  INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS workspace_cache_meta (
+        id         INTEGER PRIMARY KEY CHECK (id = 1),
+        cached_at  INTEGER NOT NULL
+      );
+    `);
+    db.exec("PRAGMA user_version = 5");
+  }
 }
 
 export function getDb(): Database {

@@ -9,7 +9,6 @@ import {
   waitForWorkspace,
   buildWorkspaceContext,
   getCoderUrl,
-  listWorkspaces as listCoderWorkspaces,
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
@@ -89,12 +88,8 @@ export async function runAttach(opts: RunAttachOpts): Promise<void> {
   const cliVars = opts.vars ? parseVarsArg(opts.vars) : {};
   const prepared = await prepareTemplate(source, { cliVars });
 
-  // Workspace is already running, so we can always fetch its context if needed.
   const wsContext = prepared.needsWorkspace
-    ? buildWorkspaceContext(
-        (await listCoderWorkspaces()).find((w) => w.name === workspace.name) ?? workspace,
-        await getCoderUrl(),
-      )
+    ? buildWorkspaceContext(workspace, await getCoderUrl())
     : undefined;
   const template = await prepared.finalize({ workspace: wsContext });
 

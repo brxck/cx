@@ -4,10 +4,10 @@ import pc from "picocolors";
 import consola from "consola";
 import {
   deleteWorkspace,
-  listWorkspaces,
   requireCoderLogin,
   type CoderWorkspace,
 } from "../lib/coder.ts";
+import { loadWorkspaces } from "../lib/workspace-cache.ts";
 import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 import * as cmux from "../lib/cmux.ts";
 import {
@@ -106,8 +106,9 @@ export const deleteCommand = defineCommand({
     const wsName = args.workspace as string | undefined;
     let ws: CoderWorkspace | null;
     if (wsName) {
-      const all = await listWorkspaces();
-      ws = all.find((w) => w.name === wsName) ?? null;
+      const { fresh } = loadWorkspaces();
+      const live = await fresh;
+      ws = live.find((w) => w.name === wsName) ?? null;
       if (!ws) {
         consola.error(`Workspace "${wsName}" not found`);
         process.exit(1);

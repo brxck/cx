@@ -1,7 +1,6 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import {
-  listWorkspaces,
   workspaceStatus,
   relativeTime,
   type CoderWorkspace,
@@ -11,6 +10,9 @@ import {
   listWorkspaces as listCmuxWorkspaces,
 } from "./cmux.ts";
 import { getAllLayouts, type LayoutEntry } from "./store.ts";
+import { loadWorkspaces } from "./workspace-cache.ts";
+
+export const REFRESH_SENTINEL = "__cx_refresh__";
 
 function statusBadge(ws: CoderWorkspace): string {
   const s = workspaceStatus(ws);
@@ -54,58 +56,146 @@ export function fuzzyMatch(query: string, target: string): boolean {
   return qi === q.length;
 }
 
-/**
- * Fetch workspaces, optionally filter, and present an interactive picker.
- * Returns the selected workspace or null if cancelled.
- * If `filter` is provided, narrows the list before presenting.
- */
-export async function pickWorkspace(opts?: {
-  filter?: string;
-  message?: string;
-}): Promise<CoderWorkspace | null> {
-  const spinner = p.spinner();
-  spinner.start("Fetching workspaces");
-
-  let workspaces: CoderWorkspace[];
-  try {
-    workspaces = await listWorkspaces();
-  } catch {
-    spinner.stop("Failed to fetch workspaces");
-    return null;
-  }
-
-  spinner.stop(`Found ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}`);
-
-  if (workspaces.length === 0) return null;
-
-  let filtered = workspaces;
-  if (opts?.filter) {
-    const exact = workspaces.find((ws) => ws.name === opts.filter);
-    if (exact) return exact;
-    filtered = workspaces.filter((ws) => fuzzyMatch(opts.filter!, ws.name));
-    if (filtered.length === 0) return null;
-  }
-
-  // Sort: running first, then alphabetical
-  filtered.sort((a, b) => {
+function sortWorkspaces(list: CoderWorkspace[]): CoderWorkspace[] {
+  return [...list].sort((a, b) => {
     const aRunning = workspaceStatus(a) === "running" ? 0 : 1;
     const bRunning = workspaceStatus(b) === "running" ? 0 : 1;
     if (aRunning !== bRunning) return aRunning - bRunning;
     return a.name.localeCompare(b.name);
   });
+}
+
+function applyFilter(list: CoderWorkspace[], filter?: string): CoderWorkspace[] {
+  if (!filter) return list;
+  return list.filter((ws) => fuzzyMatch(filter, ws.name));
+}
+
+interface PickerOpts {
+  filter?: string;
+  message?: string;
+}
+
+/**
+ * Run the picker against an already-resolved workspace list. Used for re-prompt
+ * paths (sentinel refresh, removed pick) where SWR has already settled.
+ */
+export async function pickWorkspaceFromList(
+  list: CoderWorkspace[],
+  opts?: PickerOpts,
+): Promise<CoderWorkspace | null> {
+  const filtered = applyFilter(list, opts?.filter);
+  if (filtered.length === 0) return null;
+  if (opts?.filter) {
+    const exact = filtered.find((ws) => ws.name === opts.filter);
+    if (exact) return exact;
+  }
+
+  const sorted = sortWorkspaces(filtered);
 
   const selected = await p.autocomplete({
     message: opts?.message ?? "Select a workspace",
-    options: filtered.map((ws) => ({
-      value: ws.name,
-      label: formatWorkspaceLabel(ws),
-    })),
+    options: () => buildPickerOptions(sorted),
+    placeholder: "Type to filter",
+  });
+
+  if (p.isCancel(selected)) return null;
+  if (selected === REFRESH_SENTINEL) {
+    return pickWorkspaceFromList(list, opts);
+  }
+  return sorted.find((w) => w.name === selected) ?? null;
+}
+
+function buildPickerOptions(
+  list: CoderWorkspace[],
+): { value: string; label: string }[] {
+  const rows = list.map((ws) => ({
+    value: ws.name,
+    label: formatWorkspaceLabel(ws),
+  }));
+  rows.push({ value: REFRESH_SENTINEL, label: pc.dim("↻ Refresh list") });
+  return rows;
+}
+
+/**
+ * Fetch workspaces, optionally filter, and present an interactive picker.
+ * Returns the selected workspace or null if cancelled.
+ * If `filter` is provided, narrows the list before presenting.
+ *
+ * Uses stale-while-revalidate: renders against cached data instantly when
+ * available, refreshes in the background, and reconciles the picked workspace
+ * against the fresh result before returning.
+ */
+export async function pickWorkspace(opts?: PickerOpts): Promise<CoderWorkspace | null> {
+  const { cached, fresh } = loadWorkspaces();
+
+  let usedCache = false;
+  let latest: CoderWorkspace[];
+
+  if (cached && cached.workspaces.length > 0) {
+    latest = cached.workspaces;
+    usedCache = true;
+    fresh.then((list) => { latest = list; }).catch(() => {});
+  } else {
+    const spinner = p.spinner();
+    spinner.start("Fetching workspaces");
+    try {
+      latest = await fresh;
+    } catch {
+      spinner.stop("Failed to fetch workspaces");
+      return null;
+    }
+    spinner.stop(`Found ${latest.length} workspace${latest.length === 1 ? "" : "s"}`);
+  }
+
+  if (latest.length === 0) return null;
+
+  if (opts?.filter) {
+    const exact = latest.find((ws) => ws.name === opts.filter);
+    if (exact) {
+      try {
+        const freshList = await fresh;
+        return freshList.find((w) => w.name === opts.filter) ?? exact;
+      } catch {
+        return exact;
+      }
+    }
+  }
+
+  const baseMessage = opts?.message ?? "Select a workspace";
+  const message = usedCache
+    ? `${baseMessage} ${pc.dim("• refreshing…")}`
+    : baseMessage;
+
+  const selected = await p.autocomplete({
+    message,
+    options: () => buildPickerOptions(sortWorkspaces(applyFilter(latest, opts?.filter))),
     placeholder: "Type to filter",
   });
 
   if (p.isCancel(selected)) return null;
 
-  return filtered.find((w) => w.name === selected) ?? null;
+  if (selected === REFRESH_SENTINEL) {
+    let live: CoderWorkspace[];
+    try {
+      live = await fresh;
+    } catch {
+      return null;
+    }
+    return pickWorkspaceFromList(live, opts);
+  }
+
+  let freshList: CoderWorkspace[];
+  try {
+    freshList = await fresh;
+  } catch {
+    return latest.find((w) => w.name === selected) ?? null;
+  }
+
+  const freshPicked = freshList.find((w) => w.name === selected);
+  if (freshPicked) return freshPicked;
+
+  p.log.warn(`Workspace ${pc.bold(selected)} no longer exists. Re-listing…`);
+  return pickWorkspaceFromList(freshList, opts);
 }
 
 export function formatLayoutLabel(layout: LayoutEntry, cmuxRefs: Set<string>): string {

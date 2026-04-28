@@ -1,6 +1,7 @@
 import { $ } from "bun";
 import { consola } from "consola";
 import { sshHost, sshHostWithSession, buildInteractiveSshCommand } from "./ssh.ts";
+import { refreshCacheAsync } from "./workspace-cache.ts";
 
 export interface CoderWorkspace {
   id: string;
@@ -221,18 +222,21 @@ export async function createWorkspace(
   });
   const code = await proc.exited;
   if (code !== 0) throw new CoderCommandError("create", code, []);
+  refreshCacheAsync();
 }
 
 /** Stop a running Coder workspace. */
 export async function stopWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
   const { code, tail } = await runCoderProcess(["coder", "stop", name, "-y"], opts);
   if (code !== 0) throw new CoderCommandError("stop", code, tail);
+  refreshCacheAsync();
 }
 
 /** Start a stopped Coder workspace. Streams build logs through opts.onLine (defaults to stderr). */
 export async function startWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
   const { code, tail } = await runCoderProcess(["coder", "start", name], opts);
   if (code !== 0) throw new CoderCommandError("start", code, tail);
+  refreshCacheAsync();
 }
 
 /**
@@ -440,12 +444,14 @@ export async function streamLogs(
 export async function updateWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
   const { code, tail } = await runCoderProcess(["coder", "update", name, "-y"], opts);
   if (code !== 0) throw new CoderCommandError("update", code, tail);
+  refreshCacheAsync();
 }
 
 /** Restart a running Coder workspace. */
 export async function restartWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
   const { code, tail } = await runCoderProcess(["coder", "restart", name, "-y"], opts);
   if (code !== 0) throw new CoderCommandError("restart", code, tail);
+  refreshCacheAsync();
 }
 
 /** Delete a Coder workspace. */
@@ -457,6 +463,7 @@ export async function deleteWorkspace(
   if (opts?.orphan) args.push("--orphan");
   const { code, tail } = await runCoderProcess(args, opts);
   if (code !== 0) throw new CoderCommandError("delete", code, tail);
+  refreshCacheAsync();
 }
 
 /** SSH into a workspace (replaces the current process). */

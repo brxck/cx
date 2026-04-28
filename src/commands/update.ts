@@ -4,9 +4,10 @@ import consola from "consola";
 import pc from "picocolors";
 import {
   requireCoderLogin,
-  listWorkspaces,
   updateWorkspace,
+  type CoderWorkspace,
 } from "../lib/coder.ts";
+import { loadWorkspaces } from "../lib/workspace-cache.ts";
 import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
 
 export const updateCommand = defineCommand({
@@ -24,25 +25,46 @@ export const updateCommand = defineCommand({
   async run({ args }) {
     await requireCoderLogin();
 
-    const workspaces = await listWorkspaces();
+    const { cached, fresh } = loadWorkspaces();
+    let workspaces: CoderWorkspace[];
+    let usedCache = false;
+    if (cached && cached.workspaces.length > 0) {
+      workspaces = cached.workspaces;
+      usedCache = true;
+      fresh.then((list) => { workspaces = list; }).catch(() => {});
+    } else {
+      workspaces = await fresh;
+    }
 
     let wsName = args.workspace as string | undefined;
     if (!wsName) {
-      const outdated = workspaces.filter((ws) => ws.outdated);
+      let outdated = workspaces.filter((ws) => ws.outdated);
+      if (outdated.length === 0 && usedCache) {
+        workspaces = await fresh;
+        usedCache = false;
+        outdated = workspaces.filter((ws) => ws.outdated);
+      }
       if (outdated.length === 0) {
         consola.info("All workspaces are up to date");
         return;
       }
+      const message = usedCache
+        ? `Select workspace to update ${pc.dim("• refreshing…")}`
+        : "Select workspace to update";
       const choice = await p.autocomplete({
-        message: "Select workspace to update",
-        options: outdated.map((ws) => ({ value: ws.name, label: ws.name })),
+        message,
+        options: () =>
+          workspaces
+            .filter((ws) => ws.outdated)
+            .map((ws) => ({ value: ws.name, label: ws.name })),
         placeholder: "Type to filter",
       });
       if (p.isCancel(choice)) return;
       wsName = choice;
     }
 
-    const ws = workspaces.find((w) => w.name === wsName);
+    const live = await fresh.catch(() => workspaces);
+    const ws = live.find((w) => w.name === wsName);
     if (!ws) {
       consola.error(`Workspace "${wsName}" not found`);
       process.exit(1);

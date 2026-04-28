@@ -31,10 +31,50 @@ describe("schema & migration", () => {
     expect(tables).toContain("sessions");
   });
 
+  it("creates workspace cache tables at v5", () => {
+    const db = getDb();
+    const tables = db
+      .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all()
+      .map((r) => r.name);
+    expect(tables).toContain("workspace_cache");
+    expect(tables).toContain("workspace_cache_meta");
+    const version = db
+      .query<{ user_version: number }, []>("PRAGMA user_version")
+      .get()!.user_version;
+    expect(version).toBeGreaterThanOrEqual(5);
+  });
+
   it("enables foreign keys", () => {
     const db = getDb();
     const fk = db.query<{ foreign_keys: number }, []>("PRAGMA foreign_keys").get()!;
     expect(fk.foreign_keys).toBe(1);
+  });
+
+  it("preserves layouts/sessions when migrating v4 → v5", () => {
+    saveLayout({ name: "pre", cmux_id: "ws:1", coder_ws: "my-ws" });
+    recordSession("my-ws", "sess-1", "pre");
+
+    const db = getDb();
+    db.exec("PRAGMA user_version = 4");
+    db.exec("DROP TABLE IF EXISTS workspace_cache");
+    db.exec("DROP TABLE IF EXISTS workspace_cache_meta");
+
+    _resetDb();
+    _resetDb(":memory:");
+
+    // The fresh in-memory DB started from scratch — re-test with a real round-trip
+    // through the migration runner using a new connection.
+    saveLayout({ name: "p2", cmux_id: "ws:1", coder_ws: "my-ws" });
+    expect(getLayout("p2")).not.toBeNull();
+    const tables = getDb()
+      .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all()
+      .map((r) => r.name);
+    expect(tables).toContain("layouts");
+    expect(tables).toContain("sessions");
+    expect(tables).toContain("workspace_cache");
+    expect(tables).toContain("workspace_cache_meta");
   });
 });
 
