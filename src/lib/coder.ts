@@ -1,6 +1,6 @@
 import { $ } from "bun";
 import { consola } from "consola";
-import { sshHost } from "./ssh.ts";
+import { sshHost, sshHostWithSession, buildInteractiveSshCommand } from "./ssh.ts";
 
 export interface CoderWorkspace {
   id: string;
@@ -461,8 +461,11 @@ export async function deleteWorkspace(
 
 /** SSH into a workspace (replaces the current process). */
 export async function sshIntoWorkspace(workspaceName: string, session?: string): Promise<void> {
-  const host = session ? `${workspaceName}.${session}` : workspaceName;
-  const proc = Bun.spawn(["coder", "ssh", host], {
+  const host = session
+    ? await sshHostWithSession(workspaceName, session)
+    : await sshHost(workspaceName);
+  const cmd = await buildInteractiveSshCommand(host);
+  const proc = Bun.spawn(["bash", "-c", cmd], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",

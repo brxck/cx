@@ -75,8 +75,7 @@ export const sshCommand = defineCommand({
       required: false,
     },
     session: {
-      type: "string",
-      alias: "s",
+      type: "positional",
       description: "ZMX session name",
       required: false,
     },
@@ -88,17 +87,27 @@ export const sshCommand = defineCommand({
     },
   },
   async run({ args }) {
+    const workspace = args.workspace as string | undefined;
+    const session = args.session as string | undefined;
+
+    if (workspace && session) {
+      await recordSession(workspace, session);
+      consola.info(`Connecting to ${pc.bold(workspace)} session ${pc.cyan(session)} via SSH...`);
+      await sshIntoWorkspace(workspace, session);
+      return;
+    }
+
     await requireCoderLogin();
 
     const ws = await pickWorkspace({
-      filter: args.workspace as string | undefined,
+      filter: workspace,
       message: "Select a workspace to SSH into",
     });
 
     if (!ws) {
       consola.warn(
-        args.workspace
-          ? `No workspaces matching "${args.workspace}"`
+        workspace
+          ? `No workspaces matching "${workspace}"`
           : "No workspaces found."
       );
       process.exit(1);
@@ -106,7 +115,7 @@ export const sshCommand = defineCommand({
 
     await runSsh({
       ws,
-      session: args.session as string | undefined,
+      session,
       noSession: args["no-session"] as boolean,
     });
   },
