@@ -1,5 +1,5 @@
 import { listWorkspaces, type CoderWorkspace } from "./coder.ts";
-import { getDb } from "./store.ts";
+import { getDb, pruneStaleEntries } from "./store.ts";
 
 export interface CachedWorkspaces {
   workspaces: CoderWorkspace[];
@@ -85,6 +85,7 @@ function startRefresh(): Promise<CoderWorkspace[]> {
     try {
       const list = await listWorkspaces();
       setCachedWorkspaces(list);
+      pruneStaleEntries(list.map((ws) => ws.name));
       return list;
     } finally {
       inflight = null;

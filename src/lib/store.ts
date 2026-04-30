@@ -235,3 +235,17 @@ export function recordSession(coderWs: string, name: string, layout?: string): v
     .run(coderWs, name, layout ?? null);
 }
 
+export function pruneStaleEntries(liveWorkspaceNames: string[]): number {
+  const db = getDb();
+  const namesJson = JSON.stringify(liveWorkspaceNames);
+  const tx = db.transaction(() => {
+    const layouts = db
+      .query("DELETE FROM layouts WHERE coder_ws NOT IN (SELECT value FROM json_each(?1))")
+      .run(namesJson);
+    db.query("DELETE FROM sessions WHERE layout IS NULL AND coder_ws NOT IN (SELECT value FROM json_each(?1))")
+      .run(namesJson);
+    return layouts.changes;
+  });
+  return tx();
+}
+

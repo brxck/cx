@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { _resetDb } from "./store.ts";
+import { _resetDb, saveLayout, getLayout } from "./store.ts";
 import type { CoderWorkspace } from "./coder.ts";
 
 let mockListWorkspaces = mock(async (): Promise<CoderWorkspace[]> => []);
@@ -130,5 +130,17 @@ describe("loadWorkspaces SWR", () => {
     const b = loadWorkspaces();
     expect(a.fresh).toBe(b.fresh);
     resolveFn!([makeWorkspace("a")]);
+  });
+});
+
+describe("auto-prune on refresh", () => {
+  it("removes stale layouts after loadWorkspaces resolves", async () => {
+    saveLayout({ name: "stale-layout", cmux_id: "ws:1", coder_ws: "stale-ws" });
+    saveLayout({ name: "fresh-layout", cmux_id: "ws:2", coder_ws: "fresh-ws" });
+    mockListWorkspaces.mockImplementationOnce(async () => [makeWorkspace("fresh-ws")]);
+    const { fresh } = loadWorkspaces();
+    await fresh;
+    expect(getLayout("stale-layout")).toBeNull();
+    expect(getLayout("fresh-layout")).not.toBeNull();
   });
 });

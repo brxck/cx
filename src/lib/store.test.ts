@@ -15,6 +15,7 @@ import {
   recordSession,
   getSessions,
   getSessionsForLayout,
+  pruneStaleEntries,
 } from "./store.ts";
 
 beforeEach(() => _resetDb(":memory:"));
@@ -272,5 +273,53 @@ describe("FK constraint: recordSession before saveLayout", () => {
     saveLayout({ name: "my-layout", cmux_id: "ws:1", coder_ws: "my-ws" });
     expect(() => recordSession("my-ws", "sess-1", "my-layout")).not.toThrow();
     expect(getSessionsForLayout("my-layout")).toContain("sess-1");
+  });
+});
+
+describe("pruneStaleEntries", () => {
+  it("removes layouts for deleted workspaces, preserves live ones", () => {
+    saveLayout({ name: "live", cmux_id: "ws:1", coder_ws: "ws-live" });
+    saveLayout({ name: "stale", cmux_id: "ws:2", coder_ws: "ws-stale" });
+    const removed = pruneStaleEntries(["ws-live"]);
+    expect(removed).toBe(1);
+    expect(getLayout("live")).not.toBeNull();
+    expect(getLayout("stale")).toBeNull();
+  });
+
+  it("cascades to linked sessions", () => {
+    saveLayout({ name: "gone", cmux_id: "ws:1", coder_ws: "ws-gone" });
+    recordSession("ws-gone", "sess-1", "gone");
+    pruneStaleEntries([]);
+    expect(getSessionsForLayout("gone")).toHaveLength(0);
+  });
+
+  it("removes standalone sessions for deleted workspaces", () => {
+    recordSession("ws-stale", "standalone");
+    pruneStaleEntries(["ws-live"]);
+    expect(getSessions("ws-stale")).toHaveLength(0);
+  });
+
+  it("preserves standalone sessions for live workspaces", () => {
+    recordSession("ws-live", "standalone");
+    pruneStaleEntries(["ws-live"]);
+    expect(getSessions("ws-live")).toContain("standalone");
+  });
+
+  it("no-op when all workspaces are live", () => {
+    saveLayout({ name: "a", cmux_id: "ws:1", coder_ws: "ws-a" });
+    saveLayout({ name: "b", cmux_id: "ws:2", coder_ws: "ws-b" });
+    const removed = pruneStaleEntries(["ws-a", "ws-b"]);
+    expect(removed).toBe(0);
+    expect(getAllLayouts()).toHaveLength(2);
+  });
+
+  it("handles empty live list (prunes everything)", () => {
+    saveLayout({ name: "a", cmux_id: "ws:1", coder_ws: "ws-a" });
+    saveLayout({ name: "b", cmux_id: "ws:2", coder_ws: "ws-b" });
+    recordSession("ws-a", "standalone");
+    const removed = pruneStaleEntries([]);
+    expect(removed).toBe(2);
+    expect(getAllLayouts()).toHaveLength(0);
+    expect(getSessions("ws-a")).toHaveLength(0);
   });
 });
