@@ -17,7 +17,7 @@ const MIME_TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
-const distDir = join(import.meta.dir, "..", "src", "web", "dist");
+const distDir = join(import.meta.dir, "..", "..", "web", "dist");
 const glob = new Bun.Glob("**/*");
 const entries: Record<string, { content: string; contentType: string }> = {};
 

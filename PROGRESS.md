@@ -65,10 +65,22 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 
 | Item | Status | Notes |
 |---|---|---|
-| CLI scaffold (citty) | Done | Root command with subcommands in `src/cli.ts`, grouped help output (Lifecycle, Navigation, Workspace, Configuration) |
-| Build (bun compile) | Done | Standalone binary to `dist/` |
+| CLI scaffold (citty) | Done | Root command with subcommands in `packages/cli/src/cli.ts`, grouped help output (Lifecycle, Navigation, Workspace, Configuration) |
+| Build (bun compile) | Done | Standalone binary to `packages/cli/dist/cx` |
 | SQLite state database | Done | `~/.cx/state.db`, v2 schema with `path` column |
-| Cmux CLI integration | Done | `src/lib/cmux.ts` wraps all needed cmux commands |
+| Cmux CLI integration | Done | `packages/cli/src/lib/cmux.ts` wraps all needed cmux commands |
 | Template storage (global) | Done | `~/.config/cx/templates/*.json` |
 | Template storage (per-project) | Done | `cx.json` at project root with `templates` array |
 | cmux.json integration | Done | Writes to `~/.config/cmux/cmux.json`, preserves non-generated entries |
+| pnpm workspace monorepo | Done | Packages: `cli`, `web`, `api-types`, `raycast`. pnpm manages packages and lockfile; Bun stays as CLI runtime/bundler. |
+
+## Raycast extension
+
+| Command | Status | Notes |
+|---|---|---|
+| List Layouts | Done | Browse layouts and activate one with Enter; talks to `cx serve` over HTTP |
+| List Workspaces | Done | Manage Coder workspaces (start, stop, restart, update) |
+| Workspace Status (menu bar) | Done | Running-workspace count refreshed every 5m |
+| Up From Template | Done | Bring up a layout from a template; streams progress via SSE |
+| Find Layout | Done | Fuzzy-find a layout by name or branch and activate it |
+| Shared API contract | Done | `@cx/api-types` — single source of truth for `WorkspaceInfo`, `LayoutInfo`, `TemplateInfo`, etc. |

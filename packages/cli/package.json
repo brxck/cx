@@ -1,0 +1,31 @@
+{
+  "name": "cx",
+  "version": "0.1.0",
+  "description": "CLI for integrating Cmux with Coder remote dev environments",
+  "type": "module",
+  "bin": {
+    "cx": "./bin/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build:web": "pnpm --filter cx-web build",
+    "embed-web": "bun run scripts/embed-web.ts",
+    "build": "pnpm run build:web && pnpm run embed-web && bun build src/cli.ts --compile --outfile dist/cx",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "release": "pnpm run typecheck && pnpm run build"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.1.0",
+    "@cx/api-types": "workspace:*",
+    "citty": "^0.2.1",
+    "consola": "^3.4.2",
+    "picocolors": "^1.1.1"
+  }
+}

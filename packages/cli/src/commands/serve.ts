@@ -10,6 +10,7 @@ import { handleApps } from "../api/apps.ts";
 import { handleStart } from "../api/start.ts";
 import { handleUpdate } from "../api/update.ts";
 import { handleRestart } from "../api/restart.ts";
+import { handleActivate } from "../api/activate.ts";
 import { WEB_ASSETS } from "../web/embedded.ts";
 
 export const serveCommand = defineCommand({
@@ -22,7 +23,7 @@ export const serveCommand = defineCommand({
       type: "string",
       alias: "p",
       description: "Port to listen on",
-      default: "8080",
+      default: "7373",
     },
   },
   async run({ args }) {
@@ -100,6 +101,13 @@ export const serveCommand = defineCommand({
                   break;
                 }
                 response = await handleRestart(req);
+                break;
+              case "/api/activate":
+                if (req.method !== "POST") {
+                  response = Response.json({ error: "Method not allowed" }, { status: 405 });
+                  break;
+                }
+                response = await handleActivate(req);
                 break;
               default:
                 response = Response.json({ error: "Not found" }, { status: 404 });

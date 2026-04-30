@@ -12,13 +12,13 @@ cx bridges the gap between Coder workspaces (remote dev environments) and Cmux (
 curl -fsSL https://raw.githubusercontent.com/brxck/cx/main/install.sh | bash
 ```
 
-**From source** (requires [Bun](https://bun.sh)):
+**From source** (requires [Bun](https://bun.sh) and [pnpm](https://pnpm.io)):
 
 ```bash
 git clone git@github.com:brxck/cx.git
 cd cx
-bun install
-bun link
+pnpm install
+pnpm --filter cx exec bun link
 ```
 
 ## Prerequisites
@@ -59,11 +59,17 @@ Templates can be defined globally (`~/.config/cx/templates/*.json`) or per-proje
 
 ## Development
 
+This is a pnpm monorepo. Packages: `packages/cli` (the `cx` binary), `packages/web` (embedded React UI), `packages/api-types` (shared HTTP contract), `packages/raycast` (Raycast extension).
+
 ```bash
-bun install
-bun run dev           # run in dev mode
-bun run build         # compile standalone binary to dist/
-bun run typecheck     # type-check without emitting
+pnpm install
+pnpm dev              # run CLI in dev mode (--filter cx dev)
+pnpm build            # build web, embed, compile binary to packages/cli/dist/cx
+pnpm typecheck        # pnpm -r typecheck
+
+pnpm dev:raycast      # ray develop in packages/raycast
 ```
+
+The runtime is still Bun — pnpm only manages packages and the lockfile.
 
 See [DESIGN.md](DESIGN.md) for architecture details and [PROGRESS.md](PROGRESS.md) for implementation status.

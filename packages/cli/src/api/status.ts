@@ -5,16 +5,9 @@ import {
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import { getAllLayouts, getSessionsForLayout } from "../lib/store.ts";
+import type { WorkspaceInfo, LayoutInfo } from "@cx/api-types";
 
-export interface WorkspaceInfo {
-  name: string;
-  status: string;
-  healthy: boolean;
-  outdated: boolean;
-  buildAge: string;
-  templateName: string;
-  sessions: string[];
-}
+export type { WorkspaceInfo, LayoutInfo };
 
 export async function handleStatus(): Promise<Response> {
   const [coderWorkspaces, layouts] = await Promise.all([
@@ -24,6 +17,7 @@ export async function handleStatus(): Promise<Response> {
 
   // Build session lookup from tracked layouts
   const sessionsByCoderWs = new Map<string, string[]>();
+  const layoutInfos: LayoutInfo[] = [];
   for (const layout of layouts) {
     const sessions = getSessionsForLayout(layout.name);
     if (sessions.length > 0) {
@@ -31,6 +25,17 @@ export async function handleStatus(): Promise<Response> {
       existing.push(...sessions);
       sessionsByCoderWs.set(layout.coder_ws, existing);
     }
+    layoutInfos.push({
+      name: layout.name,
+      cmuxId: layout.cmux_id,
+      coderWs: layout.coder_ws,
+      template: layout.template,
+      type: layout.type,
+      branch: layout.branch,
+      path: layout.path,
+      activeAt: layout.active_at,
+      sessions,
+    });
   }
 
   const workspaces: WorkspaceInfo[] = coderWorkspaces.map((ws) => ({
@@ -43,5 +48,5 @@ export async function handleStatus(): Promise<Response> {
     sessions: sessionsByCoderWs.get(ws.name) ?? [],
   }));
 
-  return Response.json({ workspaces });
+  return Response.json({ workspaces, layouts: layoutInfos });
 }

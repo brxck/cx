@@ -1,30 +1,13 @@
 {
-  "name": "cx",
+  "name": "cx-workspace",
+  "private": true,
   "version": "0.1.0",
-  "description": "CLI for integrating Cmux with Coder remote dev environments",
-  "type": "module",
-  "bin": {
-    "cx": "./bin/cli.ts"
-  },
+  "description": "Workspace root for the cx CLI, embedded web UI, Raycast extension, and shared API types.",
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "dev": "bun run src/cli.ts",
-    "build": "bun run build:web && bun run scripts/embed-web.ts && bun build src/cli.ts --compile --outfile dist/cx",
-    "dev:web": "cd src/web && bun run dev & bun run src/cli.ts serve && wait",
-    "build:web": "cd src/web && bun run build",
-    "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "release": "bun run typecheck && bun run build"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "@clack/prompts": "^1.1.0",
-    "citty": "^0.2.1",
-    "consola": "^3.4.2",
-    "picocolors": "^1.1.1"
+    "dev": "pnpm --filter cx dev",
+    "build": "pnpm --filter cx build",
+    "typecheck": "pnpm -r typecheck",
+    "dev:raycast": "pnpm --filter cx-raycast dev"
   }
 }

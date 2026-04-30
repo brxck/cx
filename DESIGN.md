@@ -398,3 +398,57 @@ Layouts fall into two categories that affect default behavior:
 - **Persistent** — long-lived development environments. `down` defaults to detach-only. Sessions are restored on `restore`.
 
 Set per-template or overridden at `up` time.
+
+## HTTP API
+
+`cx serve` (default port `7373`) exposes a JSON API used by the embedded web UI and the Raycast extension at `packages/raycast`. Treat this as the single integration surface for external clients — do not import `cx` libraries from other processes.
+
+| Method | Path | Body / Query | Response |
+|---|---|---|---|
+| GET | `/api/status` | — | `{ workspaces: WorkspaceInfo[], layouts: LayoutInfo[] }` |
+| GET | `/api/templates` | — | `{ templates: TemplateInfo[] }` |
+| GET | `/api/apps?workspace=…` | `workspace` query param | `{ dashboard, terminal, apps }` |
+| POST | `/api/up` | `{ template, workspace, vars? }` | SSE stream — `data: {stage, message, ...}` |
+| POST | `/api/down` | `{ layout, stop? }` | `{ ok }` |
+| POST | `/api/start` | `{ workspace }` | `{ ok }` |
+| POST | `/api/stop` | `{ workspace }` | `{ ok }` |
+| POST | `/api/restart` | `{ workspace }` | SSE stream |
+| POST | `/api/update` | `{ workspace }` | SSE stream |
+| POST | `/api/activate` | `{ layout }` | `{ ok, layout }` |
+
+All non-streaming endpoints return `{ ok: false, error }` on failure with an HTTP status of 400/404/409/500. SSE streams emit a final `{stage: "done"}` or `{stage: "error", message}` event.
+
+Implementation: `packages/cli/src/api/*.ts`, routed in `packages/cli/src/commands/serve.ts`.
+
+### Auto-start on login
+
+Drop the following at `~/Library/LaunchAgents/com.user.cx-serve.plist` and `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.cx-serve.plist` to keep `cx serve` running across reboots.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.user.cx-serve</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/YOUR_USERNAME/dev/cx/packages/cli/dist/cx</string>
+    <string>serve</string>
+    <string>--port</string>
+    <string>7373</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/cx-serve.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/cx-serve.err</string>
+</dict>
+</plist>
+```
+
+Replace `/Users/YOUR_USERNAME/dev/cx/packages/cli/dist/cx` with your `packages/cli/dist/cx` path. To unload: `launchctl bootout gui/$(id -u)/com.user.cx-serve`.
