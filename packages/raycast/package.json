@@ -1,6 +1,7 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "cx-raycast",
+  "owner": "owner.com",
   "title": "cx",
   "description": "Browse and control Cmux layouts on Coder workspaces from Raycast.",
   "icon": "icon.png",
