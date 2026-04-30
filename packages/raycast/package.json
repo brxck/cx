@@ -34,6 +34,13 @@
       "mode": "view"
     },
     {
+      "name": "open-workspace",
+      "title": "Open Workspace",
+      "subtitle": "cx",
+      "description": "Open a workspace app — Dashboard, web terminal, IDE, or per-template apps.",
+      "mode": "view"
+    },
+    {
       "name": "menu-bar-status",
       "title": "Workspace Status",
       "subtitle": "cx",

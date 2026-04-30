@@ -20,6 +20,8 @@ declare type Preferences = ExtensionPreferences
 declare namespace Preferences {
   /** Preferences accessible in the `list-workspaces` command */
   export type ListWorkspaces = ExtensionPreferences & {}
+  /** Preferences accessible in the `open-workspace` command */
+  export type OpenWorkspace = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-status` command */
   export type MenuBarStatus = ExtensionPreferences & {}
   /** Preferences accessible in the `up-from-template` command */
@@ -31,6 +33,8 @@ declare namespace Preferences {
 declare namespace Arguments {
   /** Arguments passed to the `list-workspaces` command */
   export type ListWorkspaces = {}
+  /** Arguments passed to the `open-workspace` command */
+  export type OpenWorkspace = {}
   /** Arguments passed to the `menu-bar-status` command */
   export type MenuBarStatus = {}
   /** Arguments passed to the `up-from-template` command */
