@@ -10,7 +10,7 @@ import {
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import { loadWorkspaces } from "../lib/workspace-cache.ts";
-import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
+import { printCoderFailure } from "../lib/coder-ui.ts";
 import * as cmux from "../lib/cmux.ts";
 import { getLayoutsByCoderWorkspace, removeLayout } from "../lib/store.ts";
 
@@ -49,9 +49,6 @@ export async function runPrune(opts: { yes?: boolean }): Promise<void> {
     }
   }
 
-  let deleted = 0;
-  let failed = 0;
-
   for (const ws of stopped) {
     const layouts = getLayoutsByCoderWorkspace(ws.name);
     for (const layout of layouts) {
@@ -60,26 +57,38 @@ export async function runPrune(opts: { yes?: boolean }): Promise<void> {
       } catch {}
       removeLayout(layout.name);
     }
+  }
 
-    const wsSpinner = p.spinner();
-    const heading = `Deleting ${pc.cyan(ws.name)}`;
-    wsSpinner.start(heading);
-    try {
-      await deleteWorkspace(ws.name, {
-        onLine: (line) => wsSpinner.message(formatLogForSpinner(heading, line)),
-      });
-      wsSpinner.stop(`${pc.cyan(ws.name)} deleted`);
-      deleted++;
-    } catch (err) {
-      wsSpinner.error(`Failed to delete ${pc.cyan(ws.name)}`);
-      await printCoderFailure(err, { workspace: ws.name });
-      failed++;
+  const deleteSpinner = p.spinner();
+  deleteSpinner.start(
+    `Deleting ${stopped.length} workspace${stopped.length === 1 ? "" : "s"}`,
+  );
+
+  const results = await Promise.allSettled(
+    stopped.map((ws) => deleteWorkspace(ws.name)),
+  );
+
+  let deleted = 0;
+  let failed = 0;
+  for (const result of results) {
+    if (result.status === "fulfilled") deleted++;
+    else failed++;
+  }
+
+  if (failed > 0) {
+    deleteSpinner.stop(`Deleted ${deleted}, ${failed} failed`);
+  } else {
+    deleteSpinner.stop(`Deleted ${deleted} workspace${deleted === 1 ? "" : "s"}`);
+  }
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i]!;
+    if (result.status === "rejected") {
+      await printCoderFailure(result.reason, { workspace: stopped[i]!.name });
     }
   }
 
-  const parts = [`Deleted ${deleted} workspace${deleted === 1 ? "" : "s"}`];
-  if (failed > 0) parts.push(`${failed} failed`);
-  p.outro(`${pc.green("✓")} ${parts.join(", ")}`);
+  p.outro(`${pc.green("✓")} Pruned ${deleted} workspace${deleted === 1 ? "" : "s"}`);
 }
 
 export const pruneCommand = defineCommand({

@@ -65,7 +65,6 @@ mock.module("../lib/workspace-cache.ts", () => ({
 }));
 
 mock.module("../lib/coder-ui.ts", () => ({
-  formatLogForSpinner: (_h: string, line: string) => line,
   printCoderFailure: () => Promise.resolve(),
 }));
 
@@ -135,8 +134,9 @@ describe("runPrune", () => {
     await runPrune({ yes: true });
 
     expect(mockDeleteWorkspace).toHaveBeenCalledTimes(2);
-    expect(mockDeleteWorkspace.mock.calls[0]![0]).toBe("stopped-1");
-    expect(mockDeleteWorkspace.mock.calls[1]![0]).toBe("stopped-2");
+    const deletedNames = mockDeleteWorkspace.mock.calls.map((c) => c[0]);
+    expect(deletedNames).toContain("stopped-1");
+    expect(deletedNames).toContain("stopped-2");
     expect(mockCloseWorkspace).toHaveBeenCalledTimes(1);
     expect(mockCloseWorkspace.mock.calls[0]![0]).toBe("cmux-1");
     expect(mockRemoveLayout).toHaveBeenCalledTimes(1);
@@ -172,7 +172,6 @@ describe("runPrune", () => {
     await runPrune({ yes: true });
 
     expect(mockDeleteWorkspace).toHaveBeenCalledTimes(2);
-    expect(mockDeleteWorkspace.mock.calls[1]![0]).toBe("stopped-2");
   });
 
   it("--yes skips confirmation prompt", async () => {
