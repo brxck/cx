@@ -18,8 +18,6 @@ type ExtensionPreferences = {
 declare type Preferences = ExtensionPreferences
 
 declare namespace Preferences {
-  /** Preferences accessible in the `list-layouts` command */
-  export type ListLayouts = ExtensionPreferences & {}
   /** Preferences accessible in the `list-workspaces` command */
   export type ListWorkspaces = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-status` command */
@@ -31,8 +29,6 @@ declare namespace Preferences {
 }
 
 declare namespace Arguments {
-  /** Arguments passed to the `list-layouts` command */
-  export type ListLayouts = {}
   /** Arguments passed to the `list-workspaces` command */
   export type ListWorkspaces = {}
   /** Arguments passed to the `menu-bar-status` command */

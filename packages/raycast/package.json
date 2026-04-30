@@ -27,26 +27,19 @@
   ],
   "commands": [
     {
-      "name": "list-layouts",
-      "title": "List Layouts",
-      "subtitle": "cx",
-      "description": "Browse Cmux layouts and activate one with Enter.",
-      "mode": "view"
-    },
-    {
       "name": "list-workspaces",
       "title": "List Workspaces",
       "subtitle": "cx",
-      "description": "Manage Coder workspaces — start, stop, restart, update.",
+      "description": "Browse Coder workspaces — activate layouts, start/stop, restart, update.",
       "mode": "view"
     },
     {
       "name": "menu-bar-status",
       "title": "Workspace Status",
       "subtitle": "cx",
-      "description": "Running-workspace count in the menu bar.",
+      "description": "Workspace status in the menu bar.",
       "mode": "menu-bar",
-      "interval": "5m"
+      "interval": "1m"
     },
     {
       "name": "up-from-template",

@@ -120,14 +120,12 @@ export function WorkspaceCard({
       disabled: toggling,
     });
   }
-  if (workspace.outdated) {
-    actionItems.push({
-      label: updating ? "Updating..." : "Update",
-      color: "var(--accent)",
-      onClick: handleUpdate,
-      disabled: updating,
-    });
-  }
+  actionItems.push({
+    label: updating ? "Updating..." : "Update",
+    color: "var(--accent)",
+    onClick: handleUpdate,
+    disabled: updating,
+  });
   if (workspace.sessions.length > 0) {
     actionItems.push({
       label: tearing ? "Tearing down..." : "Tear Down",
@@ -156,9 +154,6 @@ export function WorkspaceCard({
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <span style={dim}>{workspace.templateName}</span>
         <span style={dim}>{workspace.buildAge} ago</span>
-        {workspace.outdated && (
-          <span style={{ color: "var(--yellow)", fontSize: 13, fontWeight: 500 }}>Outdated</span>
-        )}
         {workspace.sessions.length > 0 && (
           <span style={dim}>
             {workspace.sessions.length} session{workspace.sessions.length !== 1 ? "s" : ""}
