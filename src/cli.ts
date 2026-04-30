@@ -21,11 +21,12 @@ import { initCommand } from "./commands/init.ts";
 import { updateCommand } from "./commands/update.ts";
 import { restartCommand } from "./commands/restart.ts";
 import { serveCommand } from "./commands/serve.ts";
+import { pruneCommand } from "./commands/prune.ts";
 
 const commandGroups = [
   {
     label: "Lifecycle",
-    commands: ["up", "down", "attach", "detach", "restart", "update", "delete"],
+    commands: ["up", "down", "attach", "detach", "restart", "update", "delete", "prune"],
   },
   {
     label: "Navigation",
@@ -69,6 +70,7 @@ const main = defineCommand({
     update: updateCommand,
     restart: restartCommand,
     delete: deleteCommand,
+    prune: pruneCommand,
     init: initCommand,
     serve: serveCommand,
   },
