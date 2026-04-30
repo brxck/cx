@@ -25,7 +25,7 @@ export function zmxBlock(coderPath: string): string {
 # Plain Coder SSH — no ZMX, clean shell (used by cmux ssh, direct connections)
 Match host *.coder,!coder-vscode.*
     ProxyCommand ${coderPath} ssh --stdio --hostname-suffix coder %h
-    ControlPath ~/.ssh/cm-%r@%h:%p
+    ControlPath ~/.ssh/cm-%C
     ControlMaster auto
     ControlPersist 10m
     ConnectTimeout 0
@@ -38,7 +38,7 @@ Match host *.coder.*,!coder-vscode.*
     ProxyCommand bash -c 'h=%h; exec ${coderPath} ssh --stdio --hostname-suffix coder "\${h%%.*}"'
     RemoteCommand session=%k; zmx attach "$(echo $session | sed 's/.*\\.//')"
     RequestTTY yes
-    ControlPath ~/.ssh/cm-%r@%h:%p
+    ControlPath ~/.ssh/cm-%C
     ControlMaster auto
     ControlPersist 10m
     ConnectTimeout 0

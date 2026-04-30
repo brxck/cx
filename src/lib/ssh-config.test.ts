@@ -51,6 +51,12 @@ describe("zmxBlock template", () => {
   it("interpolates the resolved coder path", () => {
     expect(BLOCK).toContain(`${CODER_PATH} ssh --stdio --hostname-suffix coder %h`);
   });
+
+  it("uses hashed ControlPath (%C) so sun_path stays under macOS's 104-byte cap", () => {
+    expect(BLOCK).not.toContain("cm-%r@%h:%p");
+    const matches = BLOCK.match(/ControlPath ~\/\.ssh\/cm-%C\b/g) ?? [];
+    expect(matches.length).toBe(2);
+  });
 });
 
 describe("mergeZmxBlock — fresh insert", () => {
