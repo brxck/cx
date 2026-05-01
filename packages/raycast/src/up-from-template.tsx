@@ -1,16 +1,32 @@
-import { Action, ActionPanel, Form, Toast, popToRoot, showToast } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Form,
+  Toast,
+  popToRoot,
+  showToast,
+} from "@raycast/api";
 import { useFetch } from "@raycast/utils";
 import { useState } from "react";
-import { CxServeUnreachable, apiUrl, upWorkspace, type TemplatesResponse } from "./api";
+import {
+  CxServeUnreachable,
+  apiUrl,
+  upWorkspace,
+  type TemplatesResponse,
+} from "./api";
 
 export default function Command() {
-  const { isLoading, data, error } = useFetch<TemplatesResponse>(apiUrl("/api/templates"));
+  const { isLoading, data, error } = useFetch<TemplatesResponse>(
+    apiUrl("/api/templates"),
+  );
   const [submitting, setSubmitting] = useState(false);
 
   if (error) {
     return (
       <Form>
-        <Form.Description text={`Cannot reach cx serve: ${error.message}\nRun \`cx serve\` and try again.`} />
+        <Form.Description
+          text={`Cannot reach cx serve: ${error.message}\nRun \`cx serve\` and try again.`}
+        />
       </Form>
     );
   }
@@ -23,10 +39,17 @@ export default function Command() {
       actions={
         <ActionPanel>
           <Action.SubmitForm
-            title="Bring Up Layout"
-            onSubmit={async (values: { template: string; workspace: string; vars: string }) => {
+            title="Bring up Layout"
+            onSubmit={async (values: {
+              template: string;
+              workspace: string;
+              vars: string;
+            }) => {
               if (!values.template || !values.workspace) {
-                await showToast({ style: Toast.Style.Failure, title: "template and workspace are required" });
+                await showToast({
+                  style: Toast.Style.Failure,
+                  title: "template and workspace are required",
+                });
                 return;
               }
               let parsedVars: Record<string, string> | undefined;
@@ -70,8 +93,12 @@ export default function Command() {
                 }
               } catch (err) {
                 toast.style = Toast.Style.Failure;
-                toast.title = err instanceof CxServeUnreachable ? "cx serve unreachable" : "Up failed";
-                toast.message = err instanceof Error ? err.message : String(err);
+                toast.title =
+                  err instanceof CxServeUnreachable
+                    ? "cx serve unreachable"
+                    : "Up failed";
+                toast.message =
+                  err instanceof Error ? err.message : String(err);
               } finally {
                 setSubmitting(false);
               }
@@ -86,7 +113,11 @@ export default function Command() {
             key={`${tpl.source}:${tpl.name}`}
             value={tpl.name}
             title={tpl.name}
-            keywords={[tpl.coderTemplate ?? "", tpl.type ?? "", tpl.source].filter(Boolean)}
+            keywords={[
+              tpl.coderTemplate ?? "",
+              tpl.type ?? "",
+              tpl.source,
+            ].filter(Boolean)}
           />
         ))}
       </Form.Dropdown>

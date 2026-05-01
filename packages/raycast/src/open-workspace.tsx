@@ -1,8 +1,16 @@
-import { Action, ActionPanel, Color, Icon, List, Toast, open, showToast } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Color,
+  Icon,
+  List,
+  Toast,
+  open,
+  showToast,
+} from "@raycast/api";
 import { useFetch } from "@raycast/utils";
 import {
   apiUrl,
-  getApps,
   type AppsResponse,
   type StatusResponse,
   type WorkspaceInfo,
@@ -17,7 +25,10 @@ const STATUS_COLORS: Record<string, Color> = {
 };
 
 function statusIcon(ws: WorkspaceInfo) {
-  return { source: Icon.Circle, tintColor: STATUS_COLORS[ws.status] ?? Color.SecondaryText };
+  return {
+    source: Icon.Circle,
+    tintColor: STATUS_COLORS[ws.status] ?? Color.SecondaryText,
+  };
 }
 
 interface AppEntry {
@@ -29,8 +40,18 @@ interface AppEntry {
 
 function buildAppList(apps: AppsResponse): AppEntry[] {
   const entries: AppEntry[] = [
-    { slug: "dashboard", label: "Dashboard", url: apps.dashboard, icon: Icon.Globe },
-    { slug: "terminal", label: "Web Terminal", url: apps.terminal, icon: Icon.Terminal },
+    {
+      slug: "dashboard",
+      label: "Dashboard",
+      url: apps.dashboard,
+      icon: Icon.Globe,
+    },
+    {
+      slug: "terminal",
+      label: "Web Terminal",
+      url: apps.terminal,
+      icon: Icon.Terminal,
+    },
   ];
   for (const app of apps.apps) {
     if (app.slug === "dashboard") continue;
@@ -71,7 +92,10 @@ function AppsView({ workspace }: { workspace: string }) {
       searchBarPlaceholder={`Apps for ${workspace}…`}
     >
       {apps.length === 0 && !isLoading ? (
-        <List.EmptyView icon={Icon.AppWindow} title="No apps for this workspace" />
+        <List.EmptyView
+          icon={Icon.AppWindow}
+          title="No apps for this workspace"
+        />
       ) : null}
       {apps.map((app) => (
         <List.Item
@@ -116,9 +140,12 @@ function AppsView({ workspace }: { workspace: string }) {
 }
 
 export default function Command() {
-  const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(apiUrl("/api/status"), {
-    keepPreviousData: true,
-  });
+  const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(
+    apiUrl("/api/status"),
+    {
+      keepPreviousData: true,
+    },
+  );
 
   if (error) {
     return (
@@ -143,7 +170,12 @@ export default function Command() {
       title={ws.name}
       subtitle={ws.templateName}
       accessories={[
-        { tag: { value: ws.status, color: STATUS_COLORS[ws.status] ?? Color.SecondaryText } },
+        {
+          tag: {
+            value: ws.status,
+            color: STATUS_COLORS[ws.status] ?? Color.SecondaryText,
+          },
+        },
       ]}
       actions={
         <ActionPanel>
@@ -178,12 +210,17 @@ export default function Command() {
   );
 
   return (
-    <List isLoading={isLoading} searchBarPlaceholder="Search workspaces to open…">
+    <List
+      isLoading={isLoading}
+      searchBarPlaceholder="Search workspaces to open…"
+    >
       {workspaces.length === 0 && !isLoading ? (
         <List.EmptyView icon={Icon.Folder} title="No Coder workspaces" />
       ) : null}
       {running.length > 0 ? (
-        <List.Section title={`Running · ${running.length}`}>{running.map(renderItem)}</List.Section>
+        <List.Section title={`Running · ${running.length}`}>
+          {running.map(renderItem)}
+        </List.Section>
       ) : null}
       {other.length > 0 ? (
         <List.Section title="Stopped">{other.map(renderItem)}</List.Section>

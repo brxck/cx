@@ -25,8 +25,10 @@ import {
 
 function pickStatusIcon(workspaces: WorkspaceInfo[]): Image.ImageLike {
   const running = workspaces.filter((w) => w.status === "running");
-  if (running.length === 0) return { source: Icon.Circle, tintColor: Color.SecondaryText };
-  if (running.some((w) => !w.healthy)) return { source: Icon.Circle, tintColor: Color.Red };
+  if (running.length === 0)
+    return { source: Icon.Circle, tintColor: Color.SecondaryText };
+  if (running.some((w) => !w.healthy))
+    return { source: Icon.Circle, tintColor: Color.Red };
   return { source: Icon.Circle, tintColor: Color.Green };
 }
 
@@ -52,10 +54,9 @@ function pickActiveLayout(layouts: LayoutInfo[]): LayoutInfo | undefined {
   return [...layouts].sort((a, b) => (a.activeAt > b.activeAt ? -1 : 1))[0];
 }
 
-async function runHud<T extends { ok: boolean; error?: string } | { ok: boolean }>(
-  label: string,
-  fn: () => Promise<T>,
-) {
+async function runHud<
+  T extends { ok: boolean; error?: string } | { ok: boolean },
+>(label: string, fn: () => Promise<T>) {
   await showHUD(`${label}…`);
   try {
     const result = await fn();
@@ -63,8 +64,13 @@ async function runHud<T extends { ok: boolean; error?: string } | { ok: boolean 
     if (result.ok && !errored) {
       await showHUD(`${label} done`);
     } else {
-      const message = "error" in result && result.error ? result.error : "Failed";
-      await showToast({ style: Toast.Style.Failure, title: `${label} failed`, message });
+      const message =
+        "error" in result && result.error ? result.error : "Failed";
+      await showToast({
+        style: Toast.Style.Failure,
+        title: `${label} failed`,
+        message,
+      });
     }
   } catch (err) {
     await showToast({
@@ -76,15 +82,26 @@ async function runHud<T extends { ok: boolean; error?: string } | { ok: boolean 
 }
 
 export default function Command() {
-  const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(apiUrl("/api/status"), {
-    keepPreviousData: true,
-  });
+  const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(
+    apiUrl("/api/status"),
+    {
+      keepPreviousData: true,
+    },
+  );
 
   if (error) {
     return (
-      <MenuBarExtra icon={Icon.WifiDisabled} title="cx ?" tooltip="cx serve unreachable">
+      <MenuBarExtra
+        icon={Icon.WifiDisabled}
+        title="cx ?"
+        tooltip="cx serve unreachable"
+      >
         <MenuBarExtra.Item title="cx serve unreachable" />
-        <MenuBarExtra.Item title="Retry" icon={Icon.ArrowClockwise} onAction={() => revalidate()} />
+        <MenuBarExtra.Item
+          title="Retry"
+          icon={Icon.ArrowClockwise}
+          onAction={() => revalidate()}
+        />
         <MenuBarExtra.Item
           title="Open Extension Preferences"
           onAction={() => openExtensionPreferences()}
@@ -115,12 +132,17 @@ export default function Command() {
     const wsLayouts = layoutsByWs.get(ws.name) ?? [];
     const layout = pickActiveLayout(wsLayouts);
     const isRunning = ws.status === "running";
-    const isActive = activeLayout && layout && activeLayout.name === layout.name;
+    const isActive =
+      activeLayout && layout && activeLayout.name === layout.name;
     const titleSuffix = layout ? ` · ${layout.name}` : "";
     return (
       <MenuBarExtra.Submenu
         key={ws.name}
-        icon={isActive ? { source: Icon.Eye, tintColor: Color.Blue } : workspaceIcon(ws)}
+        icon={
+          isActive
+            ? { source: Icon.Eye, tintColor: Color.Blue }
+            : workspaceIcon(ws)
+        }
         title={`${ws.name}${titleSuffix}`}
       >
         {layout ? (
@@ -128,7 +150,9 @@ export default function Command() {
             title="Activate Layout"
             icon={Icon.ArrowRight}
             onAction={async () => {
-              await runHud(`Activating ${layout.name}`, () => activateLayout(layout.name));
+              await runHud(`Activating ${layout.name}`, () =>
+                activateLayout(layout.name),
+              );
               revalidate();
             }}
           />
@@ -147,7 +171,9 @@ export default function Command() {
             title="Start"
             icon={{ source: Icon.Play, tintColor: Color.Green }}
             onAction={async () => {
-              await runHud(`Starting ${ws.name}`, () => startWorkspace(ws.name));
+              await runHud(`Starting ${ws.name}`, () =>
+                startWorkspace(ws.name),
+              );
               revalidate();
             }}
           />
@@ -156,7 +182,9 @@ export default function Command() {
           title="Restart"
           icon={Icon.RotateClockwise}
           onAction={async () => {
-            await runHud(`Restarting ${ws.name}`, () => restartWorkspace(ws.name));
+            await runHud(`Restarting ${ws.name}`, () =>
+              restartWorkspace(ws.name),
+            );
             revalidate();
           }}
         />
@@ -172,7 +200,10 @@ export default function Command() {
           title="Open in List Workspaces"
           icon={Icon.AppWindow}
           onAction={() =>
-            launchCommand({ name: "list-workspaces", type: LaunchType.UserInitiated })
+            launchCommand({
+              name: "list-workspaces",
+              type: LaunchType.UserInitiated,
+            })
           }
         />
       </MenuBarExtra.Submenu>
@@ -209,7 +240,10 @@ export default function Command() {
           title="Open List Workspaces"
           icon={Icon.AppWindow}
           onAction={() =>
-            launchCommand({ name: "list-workspaces", type: LaunchType.UserInitiated })
+            launchCommand({
+              name: "list-workspaces",
+              type: LaunchType.UserInitiated,
+            })
           }
         />
         <MenuBarExtra.Item

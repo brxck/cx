@@ -1,4 +1,14 @@
-import { Action, ActionPanel, Color, Detail, Icon, List, Toast, open, showToast } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Color,
+  Detail,
+  Icon,
+  List,
+  Toast,
+  open,
+  showToast,
+} from "@raycast/api";
 import { useFetch } from "@raycast/utils";
 import {
   CxServeUnreachable,
@@ -24,7 +34,10 @@ const STATUS_COLORS: Record<string, Color> = {
 };
 
 function statusIcon(workspace: WorkspaceInfo) {
-  return { source: Icon.Circle, tintColor: STATUS_COLORS[workspace.status] ?? Color.SecondaryText };
+  return {
+    source: Icon.Circle,
+    tintColor: STATUS_COLORS[workspace.status] ?? Color.SecondaryText,
+  };
 }
 
 function pickLayout(layouts: LayoutInfo[]): LayoutInfo | undefined {
@@ -32,10 +45,16 @@ function pickLayout(layouts: LayoutInfo[]): LayoutInfo | undefined {
   return [...layouts].sort((a, b) => (a.activeAt > b.activeAt ? -1 : 1))[0];
 }
 
-function buildAccessories(workspace: WorkspaceInfo, layout: LayoutInfo | undefined): List.Item.Accessory[] {
+function buildAccessories(
+  workspace: WorkspaceInfo,
+  layout: LayoutInfo | undefined,
+): List.Item.Accessory[] {
   const accessories: List.Item.Accessory[] = [];
   if (layout?.branch) {
-    accessories.push({ tag: { value: layout.branch, color: Color.Blue }, icon: Icon.CodeBlock });
+    accessories.push({
+      tag: { value: layout.branch, color: Color.Blue },
+      icon: Icon.CodeBlock,
+    });
   }
   if (workspace.sessions.length) {
     accessories.push({
@@ -45,15 +64,24 @@ function buildAccessories(workspace: WorkspaceInfo, layout: LayoutInfo | undefin
     });
   }
   if (!workspace.healthy) {
-    accessories.push({ icon: { source: Icon.Warning, tintColor: Color.Red }, tooltip: "Unhealthy" });
+    accessories.push({
+      icon: { source: Icon.Warning, tintColor: Color.Red },
+      tooltip: "Unhealthy",
+    });
   }
   accessories.push({
-    tag: { value: workspace.status, color: STATUS_COLORS[workspace.status] ?? Color.SecondaryText },
+    tag: {
+      value: workspace.status,
+      color: STATUS_COLORS[workspace.status] ?? Color.SecondaryText,
+    },
   });
   return accessories;
 }
 
-function workspaceDetailMarkdown(ws: WorkspaceInfo, layouts: LayoutInfo[]): string {
+function workspaceDetailMarkdown(
+  ws: WorkspaceInfo,
+  layouts: LayoutInfo[],
+): string {
   const lines: string[] = [];
   lines.push(`# ${ws.name}`, "");
   lines.push(`**Template:** ${ws.templateName}`);
@@ -72,7 +100,8 @@ function workspaceDetailMarkdown(ws: WorkspaceInfo, layouts: LayoutInfo[]): stri
       lines.push(`- Type: ${layout.type}`);
       if (layout.branch) lines.push(`- Branch: \`${layout.branch}\``);
       if (layout.path) lines.push(`- Path: \`${layout.path}\``);
-      if (layout.sessions.length) lines.push(`- Sessions: ${layout.sessions.join(", ")}`);
+      if (layout.sessions.length)
+        lines.push(`- Sessions: ${layout.sessions.join(", ")}`);
       lines.push(`- Last activated: ${layout.activeAt}`);
       lines.push("");
     }
@@ -80,8 +109,19 @@ function workspaceDetailMarkdown(ws: WorkspaceInfo, layouts: LayoutInfo[]): stri
   return lines.join("\n");
 }
 
-function WorkspaceDetail({ ws, layouts }: { ws: WorkspaceInfo; layouts: LayoutInfo[] }) {
-  return <Detail markdown={workspaceDetailMarkdown(ws, layouts)} navigationTitle={ws.name} />;
+function WorkspaceDetail({
+  ws,
+  layouts,
+}: {
+  ws: WorkspaceInfo;
+  layouts: LayoutInfo[];
+}) {
+  return (
+    <Detail
+      markdown={workspaceDetailMarkdown(ws, layouts)}
+      navigationTitle={ws.name}
+    />
+  );
 }
 
 async function runAction(
@@ -89,7 +129,10 @@ async function runAction(
   work: () => Promise<{ ok: boolean; error?: string } | { ok: boolean }>,
   revalidate: () => void,
 ) {
-  const toast = await showToast({ style: Toast.Style.Animated, title: `${label}…` });
+  const toast = await showToast({
+    style: Toast.Style.Animated,
+    title: `${label}…`,
+  });
   try {
     const result = await work();
     const errored = "error" in result && result.error;
@@ -103,7 +146,10 @@ async function runAction(
     }
   } catch (err) {
     toast.style = Toast.Style.Failure;
-    toast.title = err instanceof CxServeUnreachable ? "cx serve unreachable" : `${label} failed`;
+    toast.title =
+      err instanceof CxServeUnreachable
+        ? "cx serve unreachable"
+        : `${label} failed`;
     toast.message = err instanceof Error ? err.message : String(err);
   } finally {
     revalidate();
@@ -111,9 +157,12 @@ async function runAction(
 }
 
 export default function Command() {
-  const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(apiUrl("/api/status"), {
-    keepPreviousData: true,
-  });
+  const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(
+    apiUrl("/api/status"),
+    {
+      keepPreviousData: true,
+    },
+  );
 
   if (error) {
     return (
@@ -158,7 +207,10 @@ export default function Command() {
                     title="Activate Layout"
                     icon={Icon.ArrowRight}
                     onAction={async () => {
-                      const toast = await showToast({ style: Toast.Style.Animated, title: "Activating…" });
+                      const toast = await showToast({
+                        style: Toast.Style.Animated,
+                        title: "Activating…",
+                      });
                       try {
                         await activateLayout(layout.name);
                         toast.style = Toast.Style.Success;
@@ -167,8 +219,11 @@ export default function Command() {
                       } catch (err) {
                         toast.style = Toast.Style.Failure;
                         toast.title =
-                          err instanceof CxServeUnreachable ? "cx serve unreachable" : "Activate failed";
-                        toast.message = err instanceof Error ? err.message : String(err);
+                          err instanceof CxServeUnreachable
+                            ? "cx serve unreachable"
+                            : "Activate failed";
+                        toast.message =
+                          err instanceof Error ? err.message : String(err);
                       }
                     }}
                   />
@@ -176,13 +231,25 @@ export default function Command() {
                   <Action
                     title="Stop Workspace"
                     icon={Icon.Pause}
-                    onAction={() => runAction("Stop", () => stopWorkspace(ws.name), revalidate)}
+                    onAction={() =>
+                      runAction(
+                        "Stop",
+                        () => stopWorkspace(ws.name),
+                        revalidate,
+                      )
+                    }
                   />
                 ) : (
                   <Action
                     title="Start Workspace"
                     icon={Icon.Play}
-                    onAction={() => runAction("Start", () => startWorkspace(ws.name), revalidate)}
+                    onAction={() =>
+                      runAction(
+                        "Start",
+                        () => startWorkspace(ws.name),
+                        revalidate,
+                      )
+                    }
                   />
                 )}
 
@@ -199,27 +266,51 @@ export default function Command() {
                       title="Stop Workspace"
                       icon={Icon.Pause}
                       shortcut={{ modifiers: ["cmd"], key: "s" }}
-                      onAction={() => runAction("Stop", () => stopWorkspace(ws.name), revalidate)}
+                      onAction={() =>
+                        runAction(
+                          "Stop",
+                          () => stopWorkspace(ws.name),
+                          revalidate,
+                        )
+                      }
                     />
                   ) : (
                     <Action
                       title="Start Workspace"
                       icon={Icon.Play}
                       shortcut={{ modifiers: ["cmd"], key: "s" }}
-                      onAction={() => runAction("Start", () => startWorkspace(ws.name), revalidate)}
+                      onAction={() =>
+                        runAction(
+                          "Start",
+                          () => startWorkspace(ws.name),
+                          revalidate,
+                        )
+                      }
                     />
                   )}
                   <Action
                     title="Restart Workspace"
                     icon={Icon.RotateClockwise}
                     shortcut={{ modifiers: ["cmd"], key: "r" }}
-                    onAction={() => runAction("Restart", () => restartWorkspace(ws.name), revalidate)}
+                    onAction={() =>
+                      runAction(
+                        "Restart",
+                        () => restartWorkspace(ws.name),
+                        revalidate,
+                      )
+                    }
                   />
                   <Action
                     title="Update Workspace"
                     icon={Icon.ArrowUp}
                     shortcut={{ modifiers: ["cmd"], key: "u" }}
-                    onAction={() => runAction("Update", () => updateWorkspace(ws.name), revalidate)}
+                    onAction={() =>
+                      runAction(
+                        "Update",
+                        () => updateWorkspace(ws.name),
+                        revalidate,
+                      )
+                    }
                   />
                 </ActionPanel.Section>
 
@@ -231,16 +322,27 @@ export default function Command() {
                       style={Action.Style.Destructive}
                       shortcut={{ modifiers: ["cmd"], key: "backspace" }}
                       onAction={() =>
-                        runAction("Detach", () => downLayout(layout.name, false), revalidate)
+                        runAction(
+                          "Detach",
+                          () => downLayout(layout.name, false),
+                          revalidate,
+                        )
                       }
                     />
                     <Action
                       title="Detach and Stop Workspace"
                       icon={Icon.Stop}
                       style={Action.Style.Destructive}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "backspace" }}
+                      shortcut={{
+                        modifiers: ["cmd", "shift"],
+                        key: "backspace",
+                      }}
                       onAction={() =>
-                        runAction("Detach + stop", () => downLayout(layout.name, true), revalidate)
+                        runAction(
+                          "Detach + stop",
+                          () => downLayout(layout.name, true),
+                          revalidate,
+                        )
                       }
                     />
                   </ActionPanel.Section>
@@ -259,7 +361,8 @@ export default function Command() {
                         await showToast({
                           style: Toast.Style.Failure,
                           title: "Failed to open dashboard",
-                          message: err instanceof Error ? err.message : String(err),
+                          message:
+                            err instanceof Error ? err.message : String(err),
                         });
                       }
                     }}
@@ -276,7 +379,8 @@ export default function Command() {
                         await showToast({
                           style: Toast.Style.Failure,
                           title: "Failed to open terminal",
-                          message: err instanceof Error ? err.message : String(err),
+                          message:
+                            err instanceof Error ? err.message : String(err),
                         });
                       }
                     }}

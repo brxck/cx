@@ -145,7 +145,7 @@ export async function upWorkspace(args: {
   let lastError: string | undefined;
   let sawDone = false;
 
-  while (true) {
+  for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
     buf += decoder.decode(value, { stream: true });
@@ -157,7 +157,8 @@ export async function upWorkspace(args: {
       const json = event.slice(event.indexOf(":") + 1).trim();
       try {
         const parsed = JSON.parse(json) as { stage: string; message?: string };
-        if (parsed.stage === "error") lastError = parsed.message ?? "Unknown error";
+        if (parsed.stage === "error")
+          lastError = parsed.message ?? "Unknown error";
         if (parsed.stage === "done") sawDone = true;
       } catch {
         // ignore malformed line
@@ -191,7 +192,7 @@ export async function streamAction(
   let buf = "";
   let lastError: string | undefined;
   let sawDone = false;
-  while (true) {
+  for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
     buf += decoder.decode(value, { stream: true });
@@ -203,7 +204,8 @@ export async function streamAction(
       const json = chunk.slice(chunk.indexOf(":") + 1).trim();
       try {
         const parsed = JSON.parse(json) as { stage: string; message?: string };
-        if (parsed.stage === "error") lastError = parsed.message ?? "Unknown error";
+        if (parsed.stage === "error")
+          lastError = parsed.message ?? "Unknown error";
         if (parsed.stage === "done") sawDone = true;
       } catch {
         // ignore

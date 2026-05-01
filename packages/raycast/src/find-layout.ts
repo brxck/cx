@@ -1,5 +1,10 @@
 import { LaunchProps, Toast, showHUD, showToast } from "@raycast/api";
-import { CxServeUnreachable, activateLayout, getStatus, type LayoutInfo } from "./api";
+import {
+  CxServeUnreachable,
+  activateLayout,
+  getStatus,
+  type LayoutInfo,
+} from "./api";
 
 function fuzzyMatch(query: string, text: string): boolean {
   const q = query.toLowerCase();
@@ -13,9 +18,13 @@ function fuzzyMatch(query: string, text: string): boolean {
 }
 
 function score(query: string, layout: LayoutInfo): number {
-  const fields = [layout.name, layout.coderWs, layout.template ?? "", layout.branch ?? "", layout.path ?? ""].filter(
-    Boolean,
-  );
+  const fields = [
+    layout.name,
+    layout.coderWs,
+    layout.template ?? "",
+    layout.branch ?? "",
+    layout.path ?? "",
+  ].filter(Boolean);
   const q = query.toLowerCase();
   let best = -1;
   for (const field of fields) {
@@ -28,7 +37,9 @@ function score(query: string, layout: LayoutInfo): number {
   return best;
 }
 
-export default async function Command(props: LaunchProps<{ arguments: { query: string } }>) {
+export default async function Command(
+  props: LaunchProps<{ arguments: { query: string } }>,
+) {
   const query = props.arguments.query.trim();
   if (!query) {
     await showHUD("Empty query");
@@ -40,7 +51,10 @@ export default async function Command(props: LaunchProps<{ arguments: { query: s
     status = await getStatus();
   } catch (err) {
     if (err instanceof CxServeUnreachable) {
-      await showToast({ style: Toast.Style.Failure, title: "cx serve unreachable" });
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "cx serve unreachable",
+      });
     } else {
       await showToast({
         style: Toast.Style.Failure,
