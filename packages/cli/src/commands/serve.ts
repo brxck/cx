@@ -12,6 +12,7 @@ import { handleUpdate } from "../api/update.ts";
 import { handleRestart } from "../api/restart.ts";
 import { handleActivate } from "../api/activate.ts";
 import { WEB_ASSETS } from "../web/embedded.ts";
+import { loadOrCreateApiKey, timingSafeEqualString, KEY_PATH } from "../lib/api-key.ts";
 
 export const serveCommand = defineCommand({
   meta: {
@@ -25,29 +26,55 @@ export const serveCommand = defineCommand({
       description: "Port to listen on",
       default: "7373",
     },
+    host: {
+      type: "string",
+      alias: "H",
+      description: "Bind address (default 127.0.0.1; use 0.0.0.0 for hosted environments)",
+      default: "127.0.0.1",
+    },
   },
   async run({ args }) {
     const port = parseInt(args.port as string, 10);
+    const hostname = (args.host as string) || "127.0.0.1";
+    const apiKey = await loadOrCreateApiKey();
+
+    function authorized(req: Request): boolean {
+      const header = req.headers.get("authorization") ?? "";
+      const match = header.match(/^Bearer\s+(.+)$/i);
+      if (!match) return false;
+      return timingSafeEqualString(match[1]!.trim(), apiKey);
+    }
+
+    function injectKey(html: string): string {
+      const tag = `<meta name="cx-key" content="${apiKey}">`;
+      if (html.includes('<meta name="cx-key"')) return html;
+      if (html.includes("</head>")) return html.replace("</head>", `  ${tag}\n  </head>`);
+      return tag + html;
+    }
 
     const server = Bun.serve({
       port,
+      hostname,
       async fetch(req) {
         const url = new URL(req.url);
         const { pathname } = url;
 
-        // CORS headers for development
         const corsHeaders = {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
         };
 
         if (req.method === "OPTIONS") {
           return new Response(null, { headers: corsHeaders });
         }
 
-        // API routes
         if (pathname.startsWith("/api/")) {
+          if (!authorized(req)) {
+            const response = Response.json({ error: "Unauthorized" }, { status: 401 });
+            for (const [key, value] of Object.entries(corsHeaders)) response.headers.set(key, value);
+            return response;
+          }
           let response: Response;
           try {
             switch (pathname) {
@@ -117,27 +144,26 @@ export const serveCommand = defineCommand({
             response = Response.json({ error: "Internal server error" }, { status: 500 });
           }
 
-          // Add CORS headers to API responses
           for (const [key, value] of Object.entries(corsHeaders)) {
             response.headers.set(key, value);
           }
           return response;
         }
 
-        // Static file serving from embedded assets
         const filePath = pathname === "/" ? "/index.html" : pathname;
         const asset = WEB_ASSETS[filePath];
 
         if (asset) {
-          return new Response(asset.content, {
+          const isHtml = asset.contentType === "text/html";
+          const body = isHtml ? injectKey(asset.content) : asset.content;
+          return new Response(body, {
             headers: { "Content-Type": asset.contentType, ...corsHeaders },
           });
         }
 
-        // SPA fallback — serve index.html for client-side routing
         const index = WEB_ASSETS["/index.html"];
         if (index) {
-          return new Response(index.content, {
+          return new Response(injectKey(index.content), {
             headers: { "Content-Type": "text/html", ...corsHeaders },
           });
         }
@@ -148,13 +174,15 @@ export const serveCommand = defineCommand({
 
     consola.log("");
     consola.log(pc.bold(`  cx serve`));
-    consola.log(`  ${pc.dim("Local:")}   ${pc.cyan(`http://localhost:${server.port}`)}`);
-    consola.log(`  ${pc.dim("Network:")} ${pc.cyan(`http://0.0.0.0:${server.port}`)}`);
+    consola.log(`  ${pc.dim("Listen:")}  ${pc.cyan(`http://${hostname}:${server.port}`)}`);
+    consola.log(`  ${pc.dim("Key:")}     ${pc.dim(KEY_PATH)}`);
+    if (hostname === "0.0.0.0") {
+      consola.log(`  ${pc.yellow("Warning:")} Listening on all interfaces. Authorization is required.`);
+    }
     consola.log("");
     consola.log(pc.dim("  Press Ctrl+C to stop"));
     consola.log("");
 
-    // Keep process alive
     await new Promise(() => {});
   },
 });

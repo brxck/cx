@@ -11,6 +11,7 @@ import {
 import { useFetch } from "@raycast/utils";
 import {
   apiUrl,
+  authedInit,
   type AppsResponse,
   type StatusResponse,
   type WorkspaceInfo,
@@ -68,7 +69,7 @@ function buildAppList(apps: AppsResponse): AppEntry[] {
 function AppsView({ workspace }: { workspace: string }) {
   const { isLoading, data, error, revalidate } = useFetch<AppsResponse>(
     apiUrl(`/api/apps?workspace=${encodeURIComponent(workspace)}`),
-    { keepPreviousData: true },
+    authedInit({ keepPreviousData: true }),
   );
 
   if (error) {
@@ -142,9 +143,7 @@ function AppsView({ workspace }: { workspace: string }) {
 export default function Command() {
   const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(
     apiUrl("/api/status"),
-    {
-      keepPreviousData: true,
-    },
+    authedInit({ keepPreviousData: true }),
   );
 
   if (error) {

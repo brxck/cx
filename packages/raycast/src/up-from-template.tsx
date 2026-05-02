@@ -11,6 +11,7 @@ import { useState } from "react";
 import {
   CxServeUnreachable,
   apiUrl,
+  authedInit,
   upWorkspace,
   type TemplatesResponse,
 } from "./api";
@@ -18,6 +19,7 @@ import {
 export default function Command() {
   const { isLoading, data, error } = useFetch<TemplatesResponse>(
     apiUrl("/api/templates"),
+    authedInit({}),
   );
   const [submitting, setSubmitting] = useState(false);
 

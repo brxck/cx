@@ -14,6 +14,7 @@ import { useFetch } from "@raycast/utils";
 import {
   apiUrl,
   activateLayout,
+  authedInit,
   restartWorkspace,
   startWorkspace,
   stopWorkspace,
@@ -84,9 +85,7 @@ async function runHud<
 export default function Command() {
   const { isLoading, data, error, revalidate } = useFetch<StatusResponse>(
     apiUrl("/api/status"),
-    {
-      keepPreviousData: true,
-    },
+    authedInit({ keepPreviousData: true }),
   );
 
   if (error) {

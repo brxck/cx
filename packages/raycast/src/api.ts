@@ -1,4 +1,7 @@
 import { getPreferenceValues } from "@raycast/api";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type {
   WorkspaceInfo,
   LayoutInfo,
@@ -22,6 +25,19 @@ interface Preferences {
   port?: string;
 }
 
+const KEY_PATH = join(homedir(), ".config", "cx", "serve-key");
+
+let cachedKey: string | null = null;
+function readApiKey(): string {
+  if (cachedKey !== null) return cachedKey;
+  try {
+    cachedKey = readFileSync(KEY_PATH, "utf8").trim();
+  } catch {
+    cachedKey = "";
+  }
+  return cachedKey;
+}
+
 export function baseUrl(): string {
   const prefs = getPreferenceValues<Preferences>();
   const host = prefs.host?.trim() || "localhost";
@@ -33,6 +49,13 @@ export function apiUrl(path: string): string {
   return `${baseUrl()}${path}`;
 }
 
+function authHeaders(extra?: HeadersInit): Record<string, string> {
+  const headers: Record<string, string> = { ...(extra as Record<string, string> | undefined) };
+  const key = readApiKey();
+  if (key) headers["Authorization"] = `Bearer ${key}`;
+  return headers;
+}
+
 export class CxServeUnreachable extends Error {
   constructor(cause: unknown) {
     super(`cx serve is not reachable. Run \`cx serve\` and try again.`);
@@ -41,13 +64,23 @@ export class CxServeUnreachable extends Error {
   }
 }
 
+export class CxServeUnauthorized extends Error {
+  constructor() {
+    super(
+      `cx serve rejected the API key at ${KEY_PATH}. Restart \`cx serve\` to regenerate it, or check the file's contents.`,
+    );
+    this.name = "CxServeUnauthorized";
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(apiUrl(path), init);
+    res = await fetch(apiUrl(path), { ...init, headers: authHeaders(init?.headers) });
   } catch (err) {
     throw new CxServeUnreachable(err);
   }
+  if (res.status === 401) throw new CxServeUnauthorized();
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
     try {
@@ -59,6 +92,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(detail);
   }
   return (await res.json()) as T;
+}
+
+export function authedFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(apiUrl(path), { ...init, headers: authHeaders(init?.headers) });
+}
+
+export function authedInit<T extends Record<string, unknown>>(init?: T): T & { headers: Record<string, string> } {
+  const base = (init ?? {}) as T;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingHeaders = (base as any).headers as HeadersInit | undefined;
+  return { ...base, headers: authHeaders(existingHeaders) };
 }
 
 export function getStatus(): Promise<StatusResponse> {
@@ -117,7 +161,7 @@ export async function upWorkspace(args: {
 }): Promise<{ ok: boolean; error?: string }> {
   let res: Response;
   try {
-    res = await fetch(apiUrl("/api/up"), {
+    res = await authedFetch("/api/up", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(args),
@@ -126,6 +170,7 @@ export async function upWorkspace(args: {
     throw new CxServeUnreachable(err);
   }
 
+  if (res.status === 401) return { ok: false, error: new CxServeUnauthorized().message };
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
     try {
@@ -177,7 +222,7 @@ export async function streamAction(
 ): Promise<{ ok: boolean; error?: string }> {
   let res: Response;
   try {
-    res = await fetch(apiUrl(path), {
+    res = await authedFetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -185,6 +230,7 @@ export async function streamAction(
   } catch (err) {
     throw new CxServeUnreachable(err);
   }
+  if (res.status === 401) return { ok: false, error: new CxServeUnauthorized().message };
   if (!res.ok) return { ok: false, error: `${res.status} ${res.statusText}` };
   const reader = res.body?.getReader();
   if (!reader) return { ok: true };
