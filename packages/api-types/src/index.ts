@@ -1,3 +1,9 @@
+export interface WorkspaceApp {
+  slug: string;
+  label: string;
+  url: string;
+}
+
 export interface WorkspaceInfo {
   name: string;
   status: string;
@@ -6,6 +12,9 @@ export interface WorkspaceInfo {
   buildAge: string;
   templateName: string;
   sessions: string[];
+  dashboard?: string;
+  terminal?: string;
+  apps?: WorkspaceApp[];
 }
 
 export interface LayoutInfo {

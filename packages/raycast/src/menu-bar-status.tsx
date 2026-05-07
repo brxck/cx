@@ -6,6 +6,7 @@ import {
   MenuBarExtra,
   Toast,
   launchCommand,
+  open,
   openExtensionPreferences,
   showHUD,
   showToast,
@@ -156,45 +157,76 @@ export default function Command() {
             }}
           />
         ) : null}
-        {isRunning ? (
+
+        <MenuBarExtra.Section title="Apps">
+          {ws.dashboard ? (
+            <MenuBarExtra.Item
+              title="Dashboard"
+              icon={Icon.Globe}
+              onAction={() => open(ws.dashboard!)}
+            />
+          ) : null}
+          {ws.terminal && isRunning ? (
+            <MenuBarExtra.Item
+              title="Web Terminal"
+              icon={Icon.Terminal}
+              onAction={() => open(ws.terminal!)}
+            />
+          ) : null}
+          {isRunning
+            ? (ws.apps ?? []).map((app) => (
+                <MenuBarExtra.Item
+                  key={app.slug}
+                  title={app.label}
+                  icon={Icon.AppWindow}
+                  onAction={() => open(app.url)}
+                />
+              ))
+            : null}
+        </MenuBarExtra.Section>
+
+        <MenuBarExtra.Section title="Workspace">
+          {isRunning ? (
+            <MenuBarExtra.Item
+              title="Stop"
+              icon={{ source: Icon.Stop, tintColor: Color.Red }}
+              onAction={async () => {
+                await runHud(`Stopping ${ws.name}`, () => stopWorkspace(ws.name));
+                revalidate();
+              }}
+            />
+          ) : (
+            <MenuBarExtra.Item
+              title="Start"
+              icon={{ source: Icon.Play, tintColor: Color.Green }}
+              onAction={async () => {
+                await runHud(`Starting ${ws.name}`, () =>
+                  startWorkspace(ws.name),
+                );
+                revalidate();
+              }}
+            />
+          )}
           <MenuBarExtra.Item
-            title="Stop"
-            icon={{ source: Icon.Stop, tintColor: Color.Red }}
+            title="Restart"
+            icon={Icon.RotateClockwise}
             onAction={async () => {
-              await runHud(`Stopping ${ws.name}`, () => stopWorkspace(ws.name));
-              revalidate();
-            }}
-          />
-        ) : (
-          <MenuBarExtra.Item
-            title="Start"
-            icon={{ source: Icon.Play, tintColor: Color.Green }}
-            onAction={async () => {
-              await runHud(`Starting ${ws.name}`, () =>
-                startWorkspace(ws.name),
+              await runHud(`Restarting ${ws.name}`, () =>
+                restartWorkspace(ws.name),
               );
               revalidate();
             }}
           />
-        )}
-        <MenuBarExtra.Item
-          title="Restart"
-          icon={Icon.RotateClockwise}
-          onAction={async () => {
-            await runHud(`Restarting ${ws.name}`, () =>
-              restartWorkspace(ws.name),
-            );
-            revalidate();
-          }}
-        />
-        <MenuBarExtra.Item
-          title="Update"
-          icon={Icon.ArrowUp}
-          onAction={async () => {
-            await runHud(`Updating ${ws.name}`, () => updateWorkspace(ws.name));
-            revalidate();
-          }}
-        />
+          <MenuBarExtra.Item
+            title="Update"
+            icon={Icon.ArrowUp}
+            onAction={async () => {
+              await runHud(`Updating ${ws.name}`, () => updateWorkspace(ws.name));
+              revalidate();
+            }}
+          />
+        </MenuBarExtra.Section>
+
         <MenuBarExtra.Item
           title="Open in List Workspaces"
           icon={Icon.AppWindow}
