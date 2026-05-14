@@ -214,6 +214,7 @@ async function restoreLayout(layout: LayoutEntry): Promise<void> {
   spinner.message("Materializing layout");
   const { template: effectiveTemplate } = await materializeTemplate(effectiveSource, {
     persistedVars,
+    workspaceName: layout.coder_ws,
     interactive: false,
     workspaceFactory: async () => buildWorkspaceContext(coder, await getCoderUrl()),
   });

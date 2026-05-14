@@ -86,6 +86,7 @@ export interface TemplateReturn {
 }
 
 export interface TemplateFnContext {
+  workspaceName: string;
   input: InputHelpers;
 }
 
@@ -428,6 +429,84 @@ export async function resolveTemplate(opts?: {
   return { template: res.source.config, projectPath: res.projectPath };
 }
 
+/** True iff the user has any global or project-local template source. */
+export async function hasAnyTemplate(opts?: { cwd?: string }): Promise<boolean> {
+  const global = await listTemplateSources();
+  if (global.length > 0) return true;
+  const project = await getProjectTemplateSources(opts?.cwd);
+  return (project?.sources.length ?? 0) > 0;
+}
+
+/** Write `default.json` and `default-ephemeral.json` into the templates dir. */
+export async function seedDefaultTemplates(coderTemplate: string): Promise<void> {
+  const baseLayout: LayoutNode = { pane: { surfaces: [{ type: "terminal" }] } };
+  await saveTemplate({
+    name: "default",
+    coder: { template: coderTemplate },
+    type: "persistent",
+    layout: baseLayout,
+  });
+  await saveTemplate({
+    name: "default-ephemeral",
+    coder: { template: coderTemplate },
+    type: "ephemeral",
+    layout: baseLayout,
+  });
+}
+
+/**
+ * Seed `default` + `default-ephemeral` template files on first run. No-op when
+ * the user already has any template (global or project-local). Never overwrites
+ * or re-seeds — once a user has templates, they own that directory.
+ *
+ * If `defaultCoderTemplate` is omitted, prompts the user to pick a Coder
+ * template via an interactive autocomplete.
+ */
+export async function ensureDefaultsSeeded(opts?: {
+  cwd?: string;
+  defaultCoderTemplate?: string;
+}): Promise<{ seeded: boolean }> {
+  if (await hasAnyTemplate({ cwd: opts?.cwd })) return { seeded: false };
+
+  let coderTemplate = opts?.defaultCoderTemplate;
+  if (!coderTemplate) {
+    const { listCoderTemplates } = await import("./coder.ts");
+    const p = await import("@clack/prompts");
+    const pc = (await import("picocolors")).default;
+
+    const spinner = p.spinner();
+    spinner.start("Loading Coder templates");
+    const coderTemplates = await listCoderTemplates();
+    spinner.stop(`Found ${coderTemplates.length} Coder template${coderTemplates.length === 1 ? "" : "s"}`);
+
+    if (coderTemplates.length === 0) {
+      p.log.error("No Coder templates available. Ask your admin to create one.");
+      process.exit(1);
+    }
+
+    coderTemplates.sort((a, b) => a.name.localeCompare(b.name));
+
+    p.log.info("No cx templates found — seeding default + default-ephemeral");
+    const choice = await p.autocomplete({
+      message: "Select a Coder template to back the defaults",
+      options: coderTemplates.map((t) => ({
+        value: t.name,
+        label: `${pc.bold(t.name)}${t.description ? `  ${pc.dim(t.description)}` : ""}`,
+      })),
+      placeholder: "Type to filter",
+    });
+
+    if (p.isCancel(choice)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+    coderTemplate = choice as string;
+  }
+
+  await seedDefaultTemplates(coderTemplate);
+  return { seeded: true };
+}
+
 /** Delete a template by name. Returns true if any matching file existed. */
 export function deleteTemplate(name: string): boolean {
   let removed = false;
@@ -446,6 +525,8 @@ export function deleteTemplate(name: string): boolean {
 export interface MaterializeOptions {
   cliVars?: Record<string, string>;
   persistedVars?: ResolvedInputs;
+  /** Workspace name passed into the template fn context. Defaults to "". */
+  workspaceName?: string;
   /** Thunk invoked lazily when a JS template's layout or ports is a function. */
   workspaceFactory?: () => Promise<WorkspaceContext>;
   /**
@@ -508,7 +589,7 @@ export async function prepareTemplate(
     persistedVars: opts.persistedVars,
     interactive: opts.interactive,
   });
-  const returned = await source.fn({ input });
+  const returned = await source.fn({ workspaceName: opts.workspaceName ?? "", input });
   const name = returned.name ?? source.name;
 
   const layoutIsFn = typeof returned.layout === "function";
@@ -575,6 +656,7 @@ export async function materializeTemplate(
   const prepared = await prepareTemplate(source, {
     cliVars: opts.cliVars,
     persistedVars: opts.persistedVars,
+    workspaceName: opts.workspaceName,
     interactive: opts.interactive,
   });
   let workspace: WorkspaceContext | undefined;

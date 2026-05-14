@@ -77,6 +77,7 @@ async function getTemplatePortsForWorkspace(coderWs: string): Promise<string[] |
     try {
       const { template } = await materializeTemplate(source, {
         persistedVars,
+        workspaceName: coderWs,
         workspaceFactory: async () => {
           const ws = (await listCoderWorkspaces()).find((w) => w.name === coderWs);
           if (!ws) throw new Error(`Workspace "${coderWs}" not running`);
@@ -277,6 +278,12 @@ export const portForwardCommand = defineCommand({
       type: "boolean",
       description: "Start port forwards defined in the workspace's layout template",
     },
+    all: {
+      type: "boolean",
+      alias: "a",
+      description: "Show all workspaces including stopped",
+      default: false,
+    },
   },
   async run({ args }) {
     await requireCoderLogin();
@@ -284,6 +291,7 @@ export const portForwardCommand = defineCommand({
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace for port forwarding",
+      showStopped: args.all as boolean,
     });
 
     if (!ws) {

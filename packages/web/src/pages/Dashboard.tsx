@@ -60,6 +60,7 @@ export function Dashboard() {
 
   const workspaces = data?.workspaces ?? [];
   const running = workspaces.filter((w) => w.status === "running").length;
+  const unhealthy = workspaces.filter((w) => w.status === "running" && !w.healthy).length;
 
   return (
     <div style={page}>
@@ -84,6 +85,11 @@ export function Dashboard() {
       <div style={summary}>
         <span>{workspaces.length} workspace{workspaces.length !== 1 ? "s" : ""}</span>
         <span>{running} running</span>
+        {unhealthy > 0 && (
+          <span style={{ color: "var(--red)" }}>
+            {unhealthy} unhealthy
+          </span>
+        )}
       </div>
     </div>
   );

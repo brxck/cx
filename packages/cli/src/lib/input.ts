@@ -14,6 +14,7 @@ export interface CommonOpts {
 }
 export interface TextOpts extends CommonOpts {
   default?: string;
+  placeholder?: string;
 }
 export interface NumberOpts extends CommonOpts {
   default?: number;
@@ -108,7 +109,7 @@ export function createInputHelpers(ctx: InputContext = {}): {
       }
       const value = await p.text({
         message: message(name, opts),
-        placeholder: name,
+        placeholder: opts?.placeholder ?? name,
         initialValue: opts?.default,
       });
       if (p.isCancel(value)) cancel();

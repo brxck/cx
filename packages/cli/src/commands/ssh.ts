@@ -85,6 +85,12 @@ export const sshCommand = defineCommand({
       description: "Connect without a ZMX session",
       default: false,
     },
+    all: {
+      type: "boolean",
+      alias: "a",
+      description: "Show all workspaces including stopped",
+      default: false,
+    },
   },
   async run({ args }) {
     const workspace = args.workspace as string | undefined;
@@ -102,6 +108,7 @@ export const sshCommand = defineCommand({
     const ws = await pickWorkspace({
       filter: workspace,
       message: "Select a workspace to SSH into",
+      showStopped: args.all as boolean,
     });
 
     if (!ws) {

@@ -13,6 +13,7 @@ import { getAllLayouts, type LayoutEntry } from "./store.ts";
 import { loadWorkspaces } from "./workspace-cache.ts";
 
 export const REFRESH_SENTINEL = "__cx_refresh__";
+export const SHOW_ALL_SENTINEL = "__cx_show_all__";
 
 function statusBadge(ws: CoderWorkspace): string {
   const s = workspaceStatus(ws);
@@ -73,6 +74,7 @@ function applyFilter(list: CoderWorkspace[], filter?: string): CoderWorkspace[] 
 interface PickerOpts {
   filter?: string;
   message?: string;
+  showStopped?: boolean;
 }
 
 /**
@@ -90,11 +92,11 @@ export async function pickWorkspaceFromList(
     if (exact) return exact;
   }
 
-  const sorted = sortWorkspaces(filtered);
+  const showStopped = opts?.showStopped ?? false;
 
   const selected = await p.autocomplete({
     message: opts?.message ?? "Select a workspace",
-    options: () => buildPickerOptions(sorted),
+    options: () => buildPickerOptions(filtered, showStopped),
     placeholder: "Type to filter",
   });
 
@@ -102,16 +104,37 @@ export async function pickWorkspaceFromList(
   if (selected === REFRESH_SENTINEL) {
     return pickWorkspaceFromList(list, opts);
   }
-  return sorted.find((w) => w.name === selected) ?? null;
+  if (selected === SHOW_ALL_SENTINEL) {
+    return pickWorkspaceFromList(list, { ...opts, showStopped: true });
+  }
+  return list.find((w) => w.name === selected) ?? null;
 }
 
 function buildPickerOptions(
   list: CoderWorkspace[],
+  showStopped: boolean,
 ): { value: string; label: string }[] {
-  const rows = list.map((ws) => ({
+  let visible = list;
+  let hasHidden = false;
+
+  if (!showStopped) {
+    const active = list.filter((ws) => {
+      const s = workspaceStatus(ws);
+      return s !== "stopped" && s !== "failed";
+    });
+    if (active.length > 0) {
+      visible = active;
+      hasHidden = active.length < list.length;
+    }
+  }
+
+  const rows = sortWorkspaces(visible).map((ws) => ({
     value: ws.name,
     label: formatWorkspaceLabel(ws),
   }));
+  if (hasHidden) {
+    rows.push({ value: SHOW_ALL_SENTINEL, label: pc.dim("↻ Show stopped workspaces") });
+  }
   rows.push({ value: REFRESH_SENTINEL, label: pc.dim("↻ Refresh list") });
   return rows;
 }
@@ -161,6 +184,7 @@ export async function pickWorkspace(opts?: PickerOpts): Promise<CoderWorkspace |
     }
   }
 
+  const showStopped = opts?.showStopped ?? false;
   const baseMessage = opts?.message ?? "Select a workspace";
   const message = usedCache
     ? `${baseMessage} ${pc.dim("• refreshing…")}`
@@ -168,11 +192,21 @@ export async function pickWorkspace(opts?: PickerOpts): Promise<CoderWorkspace |
 
   const selected = await p.autocomplete({
     message,
-    options: () => buildPickerOptions(sortWorkspaces(applyFilter(latest, opts?.filter))),
+    options: () => buildPickerOptions(applyFilter(latest, opts?.filter), showStopped),
     placeholder: "Type to filter",
   });
 
   if (p.isCancel(selected)) return null;
+
+  if (selected === SHOW_ALL_SENTINEL) {
+    let live: CoderWorkspace[];
+    try {
+      live = await fresh;
+    } catch {
+      live = latest;
+    }
+    return pickWorkspaceFromList(live, { ...opts, showStopped: true });
+  }
 
   if (selected === REFRESH_SENTINEL) {
     let live: CoderWorkspace[];

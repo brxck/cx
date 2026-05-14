@@ -42,7 +42,10 @@ export async function handleUp(req: Request): Promise<Response> {
         }
 
         // 2. Phase 1 — run fn / substitute vars
-        const prepared = await prepareTemplate(source, { cliVars: body.vars });
+        const prepared = await prepareTemplate(source, {
+          cliVars: body.vars,
+          workspaceName: body.workspace,
+        });
 
         // 3. Create/start Coder workspace
         await ensureCoderWorkspace(body.workspace, prepared.coder, send);

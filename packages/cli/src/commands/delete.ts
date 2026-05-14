@@ -114,7 +114,7 @@ export const deleteCommand = defineCommand({
         process.exit(1);
       }
     } else {
-      ws = await pickWorkspace({ message: "Select a workspace to delete" });
+      ws = await pickWorkspace({ message: "Select a workspace to delete", showStopped: true });
       if (!ws) {
         p.cancel("Cancelled.");
         process.exit(0);

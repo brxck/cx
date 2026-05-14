@@ -14,6 +14,11 @@ const card: React.CSSProperties = {
   marginBottom: 12,
 };
 
+const unhealthyCard: React.CSSProperties = {
+  ...card,
+  borderColor: "color-mix(in srgb, var(--red) 40%, var(--border))",
+};
+
 const dim: React.CSSProperties = { color: "var(--text-dim)", fontSize: 13 };
 
 export function WorkspaceCard({
@@ -31,6 +36,7 @@ export function WorkspaceCard({
 
   const isRunning = workspace.status === "running";
   const isStopped = workspace.status === "stopped";
+  const isUnhealthy = isRunning && !workspace.healthy;
 
   useEffect(() => {
     fetchApps(workspace.name).then(setApps).catch(() => {});
@@ -136,13 +142,13 @@ export function WorkspaceCard({
   }
 
   return (
-    <div style={card}>
+    <div style={isUnhealthy ? unhealthyCard : card}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
             {workspace.name}
           </div>
-          <StatusBadge status={workspace.status} />
+          <StatusBadge status={workspace.status} healthy={workspace.healthy} />
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" />
@@ -158,6 +164,9 @@ export function WorkspaceCard({
           <span style={dim}>
             {workspace.sessions.length} session{workspace.sessions.length !== 1 ? "s" : ""}
           </span>
+        )}
+        {workspace.outdated && (
+          <span style={dim}>Outdated</span>
         )}
       </div>
     </div>

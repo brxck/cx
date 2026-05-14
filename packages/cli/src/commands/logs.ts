@@ -46,6 +46,12 @@ export const logsCommand = defineCommand({
       description: "Build number (default: latest)",
       required: false,
     },
+    all: {
+      type: "boolean",
+      alias: "a",
+      description: "Show all workspaces including stopped",
+      default: false,
+    },
   },
   async run({ args }) {
     await requireCoderLogin();
@@ -53,6 +59,7 @@ export const logsCommand = defineCommand({
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace to view logs",
+      showStopped: args.all as boolean,
     });
 
     if (!ws) {

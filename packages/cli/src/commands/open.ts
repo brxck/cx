@@ -232,6 +232,12 @@ export const openCommand = defineCommand({
       description: "Split pane before opening: left, right, up, down (requires --in cmux)",
       required: false,
     },
+    all: {
+      type: "boolean",
+      alias: "a",
+      description: "Show all workspaces including stopped",
+      default: false,
+    },
   },
   async run({ args }) {
     await requireCoderLogin();
@@ -239,6 +245,7 @@ export const openCommand = defineCommand({
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace to open",
+      showStopped: args.all as boolean,
     });
 
     if (!ws) {

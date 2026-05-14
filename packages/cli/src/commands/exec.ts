@@ -42,6 +42,12 @@ export const execCommand = defineCommand({
       description: "Workspace name",
       required: false,
     },
+    all: {
+      type: "boolean",
+      alias: "a",
+      description: "Show all workspaces including stopped",
+      default: false,
+    },
   },
   async run({ args, rawArgs }) {
     await requireCoderLogin();
@@ -57,6 +63,7 @@ export const execCommand = defineCommand({
     const ws = await pickWorkspace({
       filter: args.workspace as string | undefined,
       message: "Select a workspace to run command on",
+      showStopped: args.all as boolean,
     });
 
     if (!ws) {
