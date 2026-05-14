@@ -18,8 +18,8 @@ import {
   getProjectTemplateSources,
   prepareTemplate,
   templateDisplay,
+  ensureDefaultsSeeded,
   type TemplateSource,
-  type TemplateConfig,
 } from "../lib/templates.ts";
 import { parseVarsArg } from "../lib/variables.ts";
 import { saveLayout, getLayout, getSessionsForLayout, recordSession } from "../lib/store.ts";
@@ -32,6 +32,7 @@ export interface RunAttachOpts {
   vars?: string;
   noPorts?: boolean;
   runCommands?: boolean;
+  defaults?: boolean;
 }
 
 export async function runAttach(opts: RunAttachOpts): Promise<void> {
@@ -86,7 +87,8 @@ export async function runAttach(opts: RunAttachOpts): Promise<void> {
   const runCommands = opts.runCommands ?? false;
 
   const cliVars = opts.vars ? parseVarsArg(opts.vars) : {};
-  const prepared = await prepareTemplate(source, { cliVars });
+  const interactive = opts.defaults ? false : undefined;
+  const prepared = await prepareTemplate(source, { cliVars, workspaceName: workspace.name, interactive });
 
   const wsContext = prepared.needsWorkspace
     ? buildWorkspaceContext(workspace, await getCoderUrl())
@@ -168,13 +170,26 @@ export const attachCommand = defineCommand({
       type: "string",
       description: "Template variables as key=value pairs (e.g. --vars \"branch=main,port=3000\")",
     },
+    defaults: {
+      type: "boolean",
+      alias: "d",
+      description: "Skip template input prompts and use defaults",
+      default: false,
+    },
+    all: {
+      type: "boolean",
+      alias: "a",
+      description: "Show all workspaces including stopped",
+      default: false,
+    },
   },
   async run({ args }) {
     await requireCoderLogin();
 
     const workspace = await pickWorkspace({
       filter: args.workspace as string | undefined,
-      message: "Select a running workspace to attach",
+      message: "Select a workspace to attach",
+      showStopped: args.all as boolean,
     });
 
     if (!workspace) {
@@ -188,33 +203,17 @@ export const attachCommand = defineCommand({
       vars: args.vars as string | undefined,
       noPorts: args["no-ports"] as boolean,
       runCommands: args["run-commands"] as boolean,
+      defaults: args.defaults as boolean,
     });
   },
 });
-
-function buildDefaultSource(
-  coderTemplate: string,
-  type: "persistent" | "ephemeral",
-): TemplateSource {
-  const config: TemplateConfig = {
-    name: type === "ephemeral" ? "default-ephemeral" : "default",
-    coder: { template: coderTemplate },
-    type,
-    layout: { pane: { surfaces: [{ type: "terminal" }] } },
-  };
-  return { kind: "json", name: config.name, filePath: "<default>", config };
-}
 
 async function resolveAttachSource(
   templateName: string | undefined,
   coderTemplate: string,
 ): Promise<{ source: TemplateSource; projectPath: string | null }> {
-  if (templateName === "default") {
-    return { source: buildDefaultSource(coderTemplate, "persistent"), projectPath: null };
-  }
-  if (templateName === "default-ephemeral") {
-    return { source: buildDefaultSource(coderTemplate, "ephemeral"), projectPath: null };
-  }
+  await ensureDefaultsSeeded({ defaultCoderTemplate: coderTemplate });
+
   if (templateName) {
     const resolved = await resolveTemplateSource({ name: templateName });
     if (!resolved) {
@@ -230,44 +229,20 @@ async function resolveAttachSource(
 
   type PickerEntry = {
     source: TemplateSource;
-    origin: "project" | "global" | "default";
-    defaultType?: "persistent" | "ephemeral";
+    origin: "project" | "global";
   };
   const entries: PickerEntry[] = [
     ...projectSources.map((s) => ({ source: s, origin: "project" as const })),
     ...globalSources.map((s) => ({ source: s, origin: "global" as const })),
-    {
-      source: buildDefaultSource(coderTemplate, "persistent"),
-      origin: "default" as const,
-      defaultType: "persistent" as const,
-    },
-    {
-      source: buildDefaultSource(coderTemplate, "ephemeral"),
-      origin: "default" as const,
-      defaultType: "ephemeral" as const,
-    },
   ];
 
-  entries.sort((a, b) => {
-    if (a.origin === "default" && b.origin === "default") {
-      return a.defaultType === "persistent" ? -1 : 1;
-    }
-    if (a.origin === "default") return 1;
-    if (b.origin === "default") return -1;
-    return a.source.name.localeCompare(b.source.name);
-  });
+  entries.sort((a, b) => a.source.name.localeCompare(b.source.name));
 
   const choice = await p.autocomplete({
     message: "Select a template",
     options: entries.map((e) => {
       const d = templateDisplay(e.source);
       const projectTag = e.origin === "project" ? `  ${pc.dim("(project)")}` : "";
-      if (e.origin === "default") {
-        return {
-          value: e,
-          label: `${pc.bold(d.name)}  ${pc.dim("single pane")}  ${pc.dim(e.defaultType!)}`,
-        };
-      }
       if (d.dynamic) {
         return {
           value: e,
