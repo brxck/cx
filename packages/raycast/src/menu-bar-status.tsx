@@ -120,11 +120,10 @@ export default function Command() {
   }
 
   const running = workspaces.filter((w) => w.status === "running");
-  const stopped = workspaces.filter((w) => w.status !== "running");
   const unhealthy = running.filter((w) => !w.healthy).length;
   const title = unhealthy > 0 ? `${running.length}!` : `${running.length}`;
   const tooltip =
-    `cx · ${running.length}/${workspaces.length} running` +
+    `cx · ${running.length} running` +
     (unhealthy ? ` · ${unhealthy} unhealthy` : "");
   const activeLayout = pickActiveLayout(layouts);
 
@@ -251,12 +250,6 @@ export default function Command() {
       {running.length > 0 ? (
         <MenuBarExtra.Section title={`Running · ${running.length}`}>
           {running.map(renderWorkspace)}
-        </MenuBarExtra.Section>
-      ) : null}
-
-      {stopped.length > 0 ? (
-        <MenuBarExtra.Section title={`Stopped · ${stopped.length}`}>
-          {stopped.map(renderWorkspace)}
         </MenuBarExtra.Section>
       ) : null}
 

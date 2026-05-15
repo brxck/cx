@@ -58,7 +58,13 @@ export function Dashboard() {
     );
   }
 
-  const workspaces = data?.workspaces ?? [];
+  const STALE_STOPPED_MS = 24 * 60 * 60 * 1000;
+  const allWorkspaces = data?.workspaces ?? [];
+  const workspaces = allWorkspaces.filter((ws) => {
+    if (ws.status !== "stopped") return true;
+    const age = Date.now() - new Date(ws.lastBuildAt).getTime();
+    return age <= STALE_STOPPED_MS;
+  });
   const running = workspaces.filter((w) => w.status === "running").length;
   const unhealthy = workspaces.filter((w) => w.status === "running" && !w.healthy).length;
 

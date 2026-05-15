@@ -6,6 +6,7 @@ import {
   getCoderUrl,
   dashboardUrl,
   workspaceStatus,
+  isStaleStoppedWorkspace,
   requireCoderLogin,
   type CoderWorkspace,
 } from "../lib/coder.ts";
@@ -81,6 +82,12 @@ export const listCommand = defineCommand({
       description: "Enable interactive selection",
       default: true,
     },
+    all: {
+      type: "boolean",
+      alias: "a",
+      description: "Show all workspaces including stale stopped ones",
+      default: false,
+    },
   },
   async run({ args }) {
     await requireCoderLogin();
@@ -129,9 +136,11 @@ export const listCommand = defineCommand({
     const matchesFilter = (ws: CoderWorkspace): boolean =>
       !filterArg || fuzzyMatch(filterArg, ws.name);
 
+    const showAll = args.all as boolean;
     const sortAndFilter = (list: CoderWorkspace[]): CoderWorkspace[] =>
       list
         .filter(matchesFilter)
+        .filter((ws) => showAll || !isStaleStoppedWorkspace(ws))
         .sort((a, b) => {
           const aRunning = workspaceStatus(a) === "running" ? 0 : 1;
           const bRunning = workspaceStatus(b) === "running" ? 0 : 1;

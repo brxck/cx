@@ -3,6 +3,7 @@ import pc from "picocolors";
 import {
   workspaceStatus,
   relativeTime,
+  isStaleStoppedWorkspace,
   type CoderWorkspace,
 } from "./coder.ts";
 import {
@@ -120,7 +121,9 @@ function buildPickerOptions(
   if (!showStopped) {
     const active = list.filter((ws) => {
       const s = workspaceStatus(ws);
-      return s !== "stopped" && s !== "failed";
+      if (s === "failed") return false;
+      if (s === "stopped") return !isStaleStoppedWorkspace(ws);
+      return true;
     });
     if (active.length > 0) {
       visible = active;

@@ -118,6 +118,15 @@ export function workspaceStatus(ws: CoderWorkspace): "running" | "stopped" | "st
   return "other";
 }
 
+const STALE_STOPPED_MS = 24 * 60 * 60 * 1000;
+
+export function isStaleStoppedWorkspace(ws: CoderWorkspace): boolean {
+  const s = workspaceStatus(ws);
+  if (s !== "stopped") return false;
+  const age = Date.now() - new Date(ws.latest_build.created_at).getTime();
+  return age > STALE_STOPPED_MS;
+}
+
 /** Open a URL in the default browser. */
 export async function openInBrowser(url: string): Promise<void> {
   await $`open ${url}`.quiet();

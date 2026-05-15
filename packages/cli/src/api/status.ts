@@ -70,6 +70,7 @@ export async function handleStatus(): Promise<Response> {
       healthy: ws.health.healthy,
       outdated: ws.outdated,
       buildAge: relativeTime(ws.latest_build.created_at),
+      lastBuildAt: ws.latest_build.created_at,
       templateName: ws.template_name,
       sessions: sessionsByCoderWs.get(ws.name) ?? [],
       dashboard,

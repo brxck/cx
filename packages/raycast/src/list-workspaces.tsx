@@ -175,7 +175,13 @@ export default function Command() {
     );
   }
 
-  const workspaces = data?.workspaces ?? [];
+  const STALE_STOPPED_MS = 24 * 60 * 60 * 1000;
+  const allWorkspaces = data?.workspaces ?? [];
+  const workspaces = allWorkspaces.filter((ws) => {
+    if (ws.status !== "stopped") return true;
+    const age = Date.now() - new Date(ws.lastBuildAt).getTime();
+    return age <= STALE_STOPPED_MS;
+  });
   const layoutsByWs = new Map<string, LayoutInfo[]>();
   for (const layout of data?.layouts ?? []) {
     const list = layoutsByWs.get(layout.coderWs) ?? [];

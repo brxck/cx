@@ -10,6 +10,7 @@ export interface WorkspaceInfo {
   healthy: boolean;
   outdated: boolean;
   buildAge: string;
+  lastBuildAt: string;
   templateName: string;
   sessions: string[];
   dashboard?: string;
