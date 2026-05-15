@@ -30,22 +30,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - run: bun install
+      - run: pnpm install --frozen-lockfile
 
-      - run: cd src/web && bun install && cd ../.. && bun run build:web && bun run scripts/embed-web.ts
+      - run: pnpm --filter cx run build:web
 
-      - run: bun run typecheck
+      - run: pnpm --filter cx run embed-web
 
-      - run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
+      - run: pnpm -r typecheck
+
+      - run: pnpm --filter cx exec bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}
+          path: packages/cli/dist/${{ matrix.artifact }}
 
   release:
     needs: build
