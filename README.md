@@ -18,6 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/brxck/cx/main/install.sh | bash
 git clone git@github.com:brxck/cx.git
 cd cx
 pnpm install
+pnpm build
 pnpm --filter cx exec bun link
 ```
 
@@ -26,6 +27,10 @@ pnpm --filter cx exec bun link
 - [Cmux](https://cmux.com) — terminal workspace manager
 - [Coder CLI](https://coder.com/docs/cli) — authenticated and configured
 - [ZMX](https://github.com/neurosnap/zmx) — on your remote workspaces, for persistent sessions
+
+## First-time setup
+
+Run `cx init` to create the config file at `~/.config/cx/config.json`. Commands like `cx ssh` and `cx list` → Open SSH need this before they can connect to a workspace.
 
 ## Commands
 
