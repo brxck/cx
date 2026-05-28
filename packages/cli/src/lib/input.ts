@@ -3,6 +3,7 @@ import * as p from "@clack/prompts";
 /** JS/TS templates declare typed inputs through this helper surface. */
 export interface InputHelpers {
   text(name: string, opts?: TextOpts): Promise<string>;
+  multiline(name: string, opts?: MultilineOpts): Promise<string>;
   number(name: string, opts?: NumberOpts): Promise<number>;
   confirm(name: string, opts?: ConfirmOpts): Promise<boolean>;
   select(name: string, opts: SelectOpts): Promise<string>;
@@ -13,6 +14,10 @@ export interface CommonOpts {
   description?: string;
 }
 export interface TextOpts extends CommonOpts {
+  default?: string;
+  placeholder?: string;
+}
+export interface MultilineOpts extends CommonOpts {
   default?: string;
   placeholder?: string;
 }
@@ -112,6 +117,39 @@ export function createInputHelpers(ctx: InputContext = {}): {
         placeholder: opts?.placeholder ?? name,
         initialValue: opts?.default,
       });
+      if (p.isCancel(value)) cancel();
+      return record(value as string);
+    },
+
+    async multiline(name, opts) {
+      const record = (value: string): string => {
+        resolved[name] = value;
+        return value;
+      };
+      if (name in persisted) {
+        const val = persisted[name];
+        if (typeof val !== "string") {
+          throw new Error(`Persisted input "${name}" expected string, got ${typeof val}`);
+        }
+        return record(val);
+      }
+      if (name in cli) return record(cli[name]!);
+      if (!interactive) {
+        if (opts?.default !== undefined) return record(opts.default);
+        nonInteractive(name);
+      }
+      // @clack/core registers "space" as a navigation action, which the
+      // MultiLinePrompt key handler swallows without inserting the character.
+      // Temporarily remove it so spaces type normally.
+      const hadSpace = p.settings.actions.has("space");
+      if (hadSpace) p.settings.actions.delete("space");
+      const value = await p.multiline({
+        message: message(name, opts),
+        placeholder: opts?.placeholder ?? name,
+        defaultValue: opts?.default,
+        showSubmit: true,
+      });
+      if (hadSpace) p.settings.actions.add("space");
       if (p.isCancel(value)) cancel();
       return record(value as string);
     },
