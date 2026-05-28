@@ -14,33 +14,37 @@ import { printCoderFailure } from "../lib/coder-ui.ts";
 import * as cmux from "../lib/cmux.ts";
 import { getLayoutsByCoderWorkspace, removeLayout } from "../lib/store.ts";
 
-export async function runPrune(opts: { yes?: boolean }): Promise<void> {
+export async function runPrune(opts: { yes?: boolean; unhealthy?: boolean }): Promise<void> {
   const spinner = p.spinner();
   spinner.start("Loading workspaces");
   const { fresh } = loadWorkspaces();
   const workspaces = await fresh;
   spinner.stop("Loaded workspaces");
 
-  const stopped = workspaces.filter(
-    (ws) => workspaceStatus(ws) === "stopped",
+  const label = opts.unhealthy ? "unhealthy" : "stopped";
+  const targets = workspaces.filter((ws) =>
+    opts.unhealthy ? !ws.health.healthy : workspaceStatus(ws) === "stopped",
   );
 
-  if (stopped.length === 0) {
-    consola.info("No stopped workspaces to prune.");
+  if (targets.length === 0) {
+    consola.info(`No ${label} workspaces to prune.`);
     return;
   }
 
   p.log.info(
-    `Found ${pc.bold(String(stopped.length))} stopped workspace${stopped.length === 1 ? "" : "s"}:`,
+    `Found ${pc.bold(String(targets.length))} ${label} workspace${targets.length === 1 ? "" : "s"}:`,
   );
-  for (const ws of stopped) {
+  for (const ws of targets) {
     const age = relativeTime(ws.latest_build.created_at);
-    p.log.message(`  ${pc.cyan(ws.name)}  ${pc.dim(age + " ago")}`);
+    const extra = opts.unhealthy && ws.health.failing_agents.length > 0
+      ? `  ${pc.dim("failing agents: " + ws.health.failing_agents.join(", "))}`
+      : "";
+    p.log.message(`  ${pc.cyan(ws.name)}  ${pc.dim(age + " ago")}${extra}`);
   }
 
   if (!opts.yes) {
     const confirmed = await p.confirm({
-      message: `Delete ${stopped.length} stopped workspace${stopped.length === 1 ? "" : "s"}? This cannot be undone.`,
+      message: `Delete ${targets.length} ${label} workspace${targets.length === 1 ? "" : "s"}? This cannot be undone.`,
       initialValue: false,
     });
     if (p.isCancel(confirmed) || !confirmed) {
@@ -49,7 +53,7 @@ export async function runPrune(opts: { yes?: boolean }): Promise<void> {
     }
   }
 
-  for (const ws of stopped) {
+  for (const ws of targets) {
     const layouts = getLayoutsByCoderWorkspace(ws.name);
     for (const layout of layouts) {
       try {
@@ -61,11 +65,11 @@ export async function runPrune(opts: { yes?: boolean }): Promise<void> {
 
   const deleteSpinner = p.spinner();
   deleteSpinner.start(
-    `Deleting ${stopped.length} workspace${stopped.length === 1 ? "" : "s"}`,
+    `Deleting ${targets.length} workspace${targets.length === 1 ? "" : "s"}`,
   );
 
   const results = await Promise.allSettled(
-    stopped.map((ws) => deleteWorkspace(ws.name)),
+    targets.map((ws) => deleteWorkspace(ws.name)),
   );
 
   let deleted = 0;
@@ -84,7 +88,7 @@ export async function runPrune(opts: { yes?: boolean }): Promise<void> {
   for (let i = 0; i < results.length; i++) {
     const result = results[i]!;
     if (result.status === "rejected") {
-      await printCoderFailure(result.reason, { workspace: stopped[i]!.name });
+      await printCoderFailure(result.reason, { workspace: targets[i]!.name });
     }
   }
 
@@ -94,7 +98,7 @@ export async function runPrune(opts: { yes?: boolean }): Promise<void> {
 export const pruneCommand = defineCommand({
   meta: {
     name: "prune",
-    description: "Delete all stopped workspaces",
+    description: "Delete all stopped (or --unhealthy) workspaces",
   },
   args: {
     yes: {
@@ -103,9 +107,17 @@ export const pruneCommand = defineCommand({
       description: "Skip confirmation prompt",
       default: false,
     },
+    unhealthy: {
+      type: "boolean",
+      description: "Delete unhealthy workspaces instead of stopped ones",
+      default: false,
+    },
   },
   async run({ args }) {
     await requireCoderLogin();
-    await runPrune({ yes: args.yes as boolean });
+    await runPrune({
+      yes: args.yes as boolean,
+      unhealthy: args.unhealthy as boolean,
+    });
   },
 });
