@@ -1,0 +1,15 @@
+[tasks.menu]
+description = "Run the native macOS menu bar app"
+run = "swift run --package-path packages/macos-menu-bar cx-menu-bar"
+
+[tasks."menu:build"]
+description = "Build the native macOS menu bar app"
+run = "swift build --package-path packages/macos-menu-bar"
+
+[tasks."menu:run"]
+description = "Run the native macOS menu bar app"
+run = "swift run --package-path packages/macos-menu-bar cx-menu-bar"
+
+[tasks."menu:test"]
+description = "Run native macOS menu bar app tests"
+run = "swift test --package-path packages/macos-menu-bar"

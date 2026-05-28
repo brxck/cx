@@ -8,6 +8,10 @@
     "dev": "pnpm --filter cx dev",
     "build": "pnpm --filter cx build",
     "typecheck": "pnpm -r typecheck",
-    "dev:raycast": "pnpm --filter cx-raycast dev"
+    "dev:raycast": "pnpm --filter cx-raycast dev",
+    "menu": "mise run menu",
+    "menu:build": "mise run menu:build",
+    "menu:run": "mise run menu:run",
+    "menu:test": "mise run menu:test"
   }
 }

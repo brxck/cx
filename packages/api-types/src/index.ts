@@ -2,6 +2,7 @@ export interface WorkspaceApp {
   slug: string;
   label: string;
   url: string;
+  icon?: string;
 }
 
 export interface WorkspaceInfo {

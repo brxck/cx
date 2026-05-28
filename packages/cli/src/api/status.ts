@@ -42,6 +42,12 @@ export async function handleStatus(): Promise<Response> {
   }
 
   const coderHost = coderUrl ? new URL(coderUrl).host : "";
+  const resolveIcon = (icon?: string): string | undefined => {
+    if (!icon) return undefined;
+    if (icon.startsWith("/") && coderUrl) return `${coderUrl}${icon}`;
+    return icon;
+  };
+
   const workspaces: WorkspaceInfo[] = coderWorkspaces.map((ws) => {
     const dashboard = coderUrl ? dashboardUrl(coderUrl, ws.owner_name, ws.name) : undefined;
     const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
@@ -61,7 +67,14 @@ export async function handleStatus(): Promise<Response> {
         } else if (dashboard) {
           url = `${dashboard}/apps/${app.slug}/`;
         }
-        if (url) apps.push({ slug: app.slug, label: app.display_name, url });
+        if (url) {
+          apps.push({
+            slug: app.slug,
+            label: app.display_name,
+            url,
+            icon: resolveIcon(app.icon),
+          });
+        }
       }
     }
     apps.sort((a, b) => a.label.localeCompare(b.label));

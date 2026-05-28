@@ -6,6 +6,7 @@ packages/*/node_modules
 out
 dist
 packages/*/dist
+packages/*/.build
 packages/cli/src/web/embedded.ts
 *.tgz
 
