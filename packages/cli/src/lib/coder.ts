@@ -25,6 +25,7 @@ export interface CoderWorkspace {
         apps?: Array<{
           slug: string;
           display_name: string;
+          icon?: string;
           url?: string;
           hidden?: boolean;
           subdomain?: boolean;
@@ -403,10 +404,10 @@ export function buildWorkspaceContext(ws: CoderWorkspace, coderBaseUrl?: string)
 }
 
 /** List all openable apps for a workspace (Dashboard, VS Code, and custom apps). */
-export function listOpenableApps(ws: CoderWorkspace): Array<{ slug: string; label: string }> {
+export function listOpenableApps(ws: CoderWorkspace): Array<{ slug: string; label: string; icon?: string }> {
   const agents = ws.latest_build.resources.flatMap(r => r.agents ?? []);
   const displayApps = new Set(agents.flatMap(a => a.display_apps ?? []));
-  const apps: Array<{ slug: string; label: string }> = [];
+  const apps: Array<{ slug: string; label: string; icon?: string }> = [];
 
   // Dashboard is always available
   apps.push({ slug: "dashboard", label: "Dashboard" });
@@ -416,14 +417,17 @@ export function listOpenableApps(ws: CoderWorkspace): Array<{ slug: string; labe
     apps.push({ slug: "vscode", label: "VS Code" });
   }
 
-  // All non-hidden coder_apps
+  // All non-hidden coder_apps, sorted alphabetically by label
+  const custom: Array<{ slug: string; label: string; icon?: string }> = [];
   for (const agent of agents) {
     for (const app of agent.apps ?? []) {
       if (!app.hidden) {
-        apps.push({ slug: app.slug, label: app.display_name });
+        custom.push({ slug: app.slug, label: app.display_name, icon: app.icon });
       }
     }
   }
+  custom.sort((a, b) => a.label.localeCompare(b.label));
+  apps.push(...custom);
 
   return apps;
 }

@@ -64,6 +64,7 @@ export async function handleStatus(): Promise<Response> {
         if (url) apps.push({ slug: app.slug, label: app.display_name, url });
       }
     }
+    apps.sort((a, b) => a.label.localeCompare(b.label));
     return {
       name: ws.name,
       status: workspaceStatus(ws),
@@ -78,6 +79,8 @@ export async function handleStatus(): Promise<Response> {
       apps,
     };
   });
+
+  workspaces.sort((a, b) => new Date(b.lastBuildAt).getTime() - new Date(a.lastBuildAt).getTime());
 
   return Response.json({ workspaces, layouts: layoutInfos });
 }

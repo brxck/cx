@@ -110,6 +110,7 @@ export function streamRestart(workspace: string): AsyncGenerator<UpEvent> {
 export interface AppEntry {
   slug: string;
   label: string;
+  icon?: string;
 }
 
 export interface AppsResponse {

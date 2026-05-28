@@ -35,7 +35,11 @@ export async function handleApps(req: Request): Promise<Response> {
     return Response.json({
       dashboard,
       terminal,
-      apps: apps.map((a) => ({ slug: a.slug, label: a.label })),
+      apps: apps.map((a) => ({
+        slug: a.slug,
+        label: a.label,
+        icon: a.icon?.startsWith("/") ? `${coderUrl}${a.icon}` : a.icon,
+      })),
     });
   } catch (err: any) {
     return Response.json({ ok: false, error: err.message ?? "Unknown error" }, { status: 500 });

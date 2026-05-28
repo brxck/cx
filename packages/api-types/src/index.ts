@@ -53,5 +53,5 @@ export interface TemplatesResponse {
 export interface AppsResponse {
   dashboard: string;
   terminal: string;
-  apps: { slug: string; label: string }[];
+  apps: { slug: string; label: string; icon?: string }[];
 }

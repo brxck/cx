@@ -13,15 +13,14 @@ import { getSessions, recordSession } from "../lib/store.ts";
 export interface RunSshOpts {
   ws: CoderWorkspace;
   session?: string;
-  noSession?: boolean;
+  pick?: boolean;
 }
 
 export async function runSsh(opts: RunSshOpts): Promise<void> {
   const { ws } = opts;
   let session = opts.session;
-  const noSession = opts.noSession ?? false;
 
-  if (!session && !noSession) {
+  if (!session && opts.pick) {
     const previous = getSessions(ws.name);
     const NEW = "__new__";
     const NONE = "__none__";
@@ -79,10 +78,10 @@ export const sshCommand = defineCommand({
       description: "ZMX session name",
       required: false,
     },
-    "no-session": {
+    pick: {
       type: "boolean",
-      alias: "S",
-      description: "Connect without a ZMX session",
+      alias: "p",
+      description: "Pick from previous sessions interactively",
       default: false,
     },
     all: {
@@ -95,8 +94,9 @@ export const sshCommand = defineCommand({
   async run({ args }) {
     const workspace = args.workspace as string | undefined;
     const session = args.session as string | undefined;
+    const pick = args.pick as boolean;
 
-    if (workspace && session) {
+    if (workspace && session && !pick) {
       await recordSession(workspace, session);
       consola.info(`Connecting to ${pc.bold(workspace)} session ${pc.cyan(session)} via SSH...`);
       await sshIntoWorkspace(workspace, session);
@@ -123,7 +123,7 @@ export const sshCommand = defineCommand({
     await runSsh({
       ws,
       session,
-      noSession: args["no-session"] as boolean,
+      pick,
     });
   },
 });

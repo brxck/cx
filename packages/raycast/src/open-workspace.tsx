@@ -54,8 +54,10 @@ function buildAppList(apps: AppsResponse): AppEntry[] {
       icon: Icon.Terminal,
     },
   ];
-  for (const app of apps.apps) {
-    if (app.slug === "dashboard") continue;
+  const custom = apps.apps
+    .filter((app) => app.slug !== "dashboard")
+    .sort((a, b) => a.label.localeCompare(b.label));
+  for (const app of custom) {
     entries.push({
       slug: app.slug,
       label: app.label,

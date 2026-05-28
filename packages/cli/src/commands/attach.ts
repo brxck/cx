@@ -173,7 +173,7 @@ export const attachCommand = defineCommand({
     defaults: {
       type: "boolean",
       alias: "d",
-      description: "Skip template input prompts and use defaults",
+      description: "Use defaults for template inputs instead of prompting",
       default: false,
     },
     all: {

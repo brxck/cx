@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 
 export interface MenuItem {
   label: string;
+  icon?: React.ReactNode;
   color?: string;
   href?: string;
   onClick?: () => void;
@@ -37,7 +38,9 @@ const menuStyle: React.CSSProperties = {
 };
 
 const itemStyle: React.CSSProperties = {
-  display: "block",
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
   width: "100%",
   padding: "8px 12px",
   fontSize: 13,
@@ -85,7 +88,7 @@ export function IconMenu({ icon, items, title }: { icon: React.ReactNode; items:
                 style={{ ...itemStyle, color: item.color ?? "var(--accent)" }}
                 onClick={() => setOpen(false)}
               >
-                {item.label}
+                {item.icon}{item.label}
               </a>
             ) : (
               <button
@@ -101,7 +104,7 @@ export function IconMenu({ icon, items, title }: { icon: React.ReactNode; items:
                   item.onClick?.();
                 }}
               >
-                {item.label}
+                {item.icon}{item.label}
               </button>
             ),
           )}

@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type SyntheticEvent } from "react";
 import type { WorkspaceInfo, AppEntry } from "../api";
 import { stopWorkspace, startWorkspace, fetchApps, tearDown, streamUpdate, streamRestart } from "../api";
 import { StatusBadge } from "./StatusBadge";
 import { IconMenu, type MenuItem } from "./IconMenu";
-import { TerminalSquare, ExternalLink, MoreVertical } from "lucide-react";
+import { TerminalSquare, ExternalLink, MoreVertical, LayoutDashboard, RefreshCw, Square, Play, Download, Trash2 } from "lucide-react";
 import type { UpEvent } from "../api";
 
 const card: React.CSSProperties = {
@@ -20,6 +20,19 @@ const unhealthyCard: React.CSSProperties = {
 };
 
 const dim: React.CSSProperties = { color: "var(--text-dim)", fontSize: 13 };
+
+function AppIcon({ src, size = 14 }: { src: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <ExternalLink size={size} />;
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{ width: size, height: size }}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export function WorkspaceCard({
   workspace,
@@ -92,35 +105,43 @@ export function WorkspaceCard({
     }
   }
 
-  // Open menu: terminal + extra apps
+  // Open menu: terminal + extra apps, sorted alphabetically
   const openItems: MenuItem[] = [];
   if (apps) {
-    openItems.push({ label: "Terminal", href: apps.terminal });
+    const allApps: MenuItem[] = [
+      { label: "Terminal", icon: <TerminalSquare size={14} />, href: apps.terminal },
+    ];
     for (const app of apps.apps.filter((a) => a.slug !== "dashboard")) {
-      openItems.push({ label: app.label, href: `${apps.dashboard}/apps/${app.slug}` });
+      allApps.push({
+        label: app.label,
+        icon: app.icon ? <AppIcon src={app.icon} /> : <ExternalLink size={14} />,
+        href: `${apps.dashboard}/apps/${app.slug}`,
+      });
     }
+    allApps.sort((a, b) => a.label.localeCompare(b.label));
+    openItems.push(...allApps);
   }
 
-  // Actions menu: dashboard + start/stop + tear down
+  // Actions menu: start/stop + tear down
   const actionItems: MenuItem[] = [];
-  if (apps) {
-    actionItems.push({ label: "Dashboard", href: apps.dashboard, color: "var(--accent)" });
-  }
   if (isRunning) {
     actionItems.push({
       label: restarting ? "Restarting..." : "Restart",
+      icon: <RefreshCw size={14} />,
       color: "var(--yellow)",
       onClick: handleRestart,
       disabled: restarting,
     });
     actionItems.push({
       label: toggling ? "Stopping..." : "Stop",
+      icon: <Square size={14} />,
       onClick: handleToggle,
       disabled: toggling,
     });
   } else if (isStopped) {
     actionItems.push({
       label: toggling ? "Starting..." : "Start",
+      icon: <Play size={14} />,
       color: "var(--green)",
       onClick: handleToggle,
       disabled: toggling,
@@ -128,6 +149,7 @@ export function WorkspaceCard({
   }
   actionItems.push({
     label: updating ? "Updating..." : "Update",
+    icon: <Download size={14} />,
     color: "var(--accent)",
     onClick: handleUpdate,
     disabled: updating,
@@ -135,6 +157,7 @@ export function WorkspaceCard({
   if (workspace.sessions.length > 0) {
     actionItems.push({
       label: tearing ? "Tearing down..." : "Tear Down",
+      icon: <Trash2 size={14} />,
       color: "var(--red)",
       onClick: handleTearDown,
       disabled: tearing,
@@ -151,6 +174,31 @@ export function WorkspaceCard({
           <StatusBadge status={workspace.status} healthy={workspace.healthy} />
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {apps && (
+            <a
+              href={apps.dashboard}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Dashboard"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                color: "var(--text-dim)",
+                background: "var(--surface-hover)",
+                border: "1px solid var(--border)",
+                cursor: "pointer",
+                textDecoration: "none",
+                flexShrink: 0,
+                fontSize: 15,
+              }}
+            >
+              <LayoutDashboard size={16} />
+            </a>
+          )}
           <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" />
           <IconMenu icon={<ExternalLink size={16} />} items={openItems} title="Open" />
           <IconMenu icon={<MoreVertical size={16} />} items={actionItems} title="Actions" />

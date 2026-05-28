@@ -22,6 +22,7 @@ import { updateCommand } from "./commands/update.ts";
 import { restartCommand } from "./commands/restart.ts";
 import { serveCommand } from "./commands/serve.ts";
 import { pruneCommand } from "./commands/prune.ts";
+import { authCommand } from "./commands/auth.ts";
 
 const commandGroups = [
   {
@@ -38,7 +39,7 @@ const commandGroups = [
   },
   {
     label: "Configuration",
-    commands: ["init"],
+    commands: ["init", "auth"],
   },
   {
     label: "Server",
@@ -72,6 +73,7 @@ const main = defineCommand({
     delete: deleteCommand,
     prune: pruneCommand,
     init: initCommand,
+    auth: authCommand,
     serve: serveCommand,
   },
 });
