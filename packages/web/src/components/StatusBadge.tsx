@@ -11,8 +11,8 @@ function useStatusInfo(status: string, healthy?: boolean) {
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.unknown!;
   const unhealthy = healthy === false && status === "running";
   return {
-    dotColor: unhealthy ? "var(--red)" : s.color,
-    textColor: unhealthy ? "var(--red)" : s.color,
+    dotColor: unhealthy ? "var(--yellow)" : s.color,
+    textColor: unhealthy ? "var(--yellow)" : s.color,
     label: unhealthy ? "Unhealthy" : s.label,
   };
 }
@@ -35,7 +35,7 @@ export function StatusDot({ status, healthy }: { status: string; healthy?: boole
 
 export function StatusText({ status, healthy }: { status: string; healthy?: boolean }) {
   const { textColor, label } = useStatusInfo(status, healthy);
-  return <span style={{ color: textColor, fontSize: 13 }}>{label}</span>;
+  return <span style={{ color: textColor, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>;
 }
 
 export function StatusBadge({ status, healthy }: { status: string; healthy?: boolean }) {

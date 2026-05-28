@@ -10,14 +10,15 @@ const header: React.CSSProperties = {
 };
 
 const fab: React.CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: "50%",
-  background: "var(--accent)",
-  color: "#fff",
-  border: "none",
-  fontSize: 24,
-  fontWeight: 300,
+  padding: "6px 14px",
+  borderRadius: "var(--radius)",
+  background: "transparent",
+  color: "var(--accent)",
+  border: "1px solid var(--accent)",
+  fontSize: 12,
+  fontFamily: "inherit",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
@@ -29,14 +30,16 @@ const summary: React.CSSProperties = {
   bottom: 0,
   left: 0,
   right: 0,
-  background: "var(--surface)",
+  background: "var(--bg)",
   borderTop: "1px solid var(--border)",
-  padding: "12px 16px calc(12px + env(safe-area-inset-bottom))",
+  padding: "10px 16px calc(10px + env(safe-area-inset-bottom))",
   display: "flex",
   justifyContent: "center",
-  gap: 16,
-  fontSize: 13,
+  gap: 8,
+  fontSize: 11,
   color: "var(--text-dim)",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
 };
 
 export function Dashboard() {
@@ -65,8 +68,8 @@ export function Dashboard() {
   return (
     <div className="dashboard-page">
       <div style={header}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>cx</h1>
-        <button style={fab} onClick={() => navigate("/create")}>+</button>
+        <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--accent)", textShadow: "0 0 10px rgba(34,238,136,0.4)", letterSpacing: "0.1em" }}>&gt; cx</h1>
+        <button style={fab} onClick={() => navigate("/create")}>+ new</button>
       </div>
 
       {workspaces.length > 0 ? (
@@ -75,8 +78,8 @@ export function Dashboard() {
         ))
       ) : (
         <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-dim)" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>-</div>
-          <div>No workspaces yet</div>
+          <div style={{ fontSize: 13, marginBottom: 8, letterSpacing: "0.3em" }}>---</div>
+          <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>no workspaces</div>
         </div>
       )}
 
@@ -84,11 +87,15 @@ export function Dashboard() {
 
       <div style={summary}>
         <span>{workspaces.length} workspace{workspaces.length !== 1 ? "s" : ""}</span>
+        <span style={{ color: "var(--border)" }}>│</span>
         <span>{running} running</span>
         {unhealthy > 0 && (
-          <span style={{ color: "var(--red)" }}>
-            {unhealthy} unhealthy
-          </span>
+          <>
+            <span style={{ color: "var(--border)" }}>│</span>
+            <span style={{ color: "var(--yellow)" }}>
+              {unhealthy} unhealthy
+            </span>
+          </>
         )}
       </div>
     </div>

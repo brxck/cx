@@ -1,25 +1,21 @@
 import { useState, useEffect, type SyntheticEvent } from "react";
 import type { WorkspaceInfo, AppEntry } from "../api";
 import { stopWorkspace, startWorkspace, fetchApps, tearDown, streamUpdate, streamRestart } from "../api";
-import { StatusDot, StatusText } from "./StatusBadge";
+import { StatusText } from "./StatusBadge";
 import { IconMenu, type MenuItem } from "./IconMenu";
 import { TerminalSquare, ExternalLink, MoreVertical, LayoutDashboard, RefreshCw, Square, Play, Download, Trash2 } from "lucide-react";
 import type { UpEvent } from "../api";
 
 const card: React.CSSProperties = {
   background: "var(--surface)",
-  border: "1px solid var(--border)",
+  border: "none",
+  borderLeft: "3px solid transparent",
   borderRadius: "var(--radius)",
-  padding: 16,
-  marginBottom: 12,
+  padding: "14px 16px",
+  marginBottom: 8,
 };
 
-const unhealthyCard: React.CSSProperties = {
-  ...card,
-  borderColor: "color-mix(in srgb, var(--red) 40%, var(--border))",
-};
-
-const dim: React.CSSProperties = { color: "var(--text-dim)", fontSize: 13 };
+const dim: React.CSSProperties = { color: "var(--text-dim)", fontSize: 12 };
 
 function AppIcon({ src, size = 14 }: { src: string; size?: number }) {
   const [failed, setFailed] = useState(false);
@@ -164,8 +160,10 @@ export function WorkspaceCard({
     });
   }
 
+  const btnColor = isUnhealthy ? "var(--yellow)" : isStopped ? "var(--text-dim)" : "var(--accent)";
+
   const actionButtons = (
-    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+    <div style={{ display: "flex", gap: 6, alignItems: "center", color: btnColor }}>
       {apps && (
         <a
           href={apps.dashboard}
@@ -178,10 +176,10 @@ export function WorkspaceCard({
             justifyContent: "center",
             width: 32,
             height: 32,
-            borderRadius: 8,
-            color: "var(--text-dim)",
-            background: "var(--surface-hover)",
-            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            color: "inherit",
+            background: "transparent",
+            border: "none",
             cursor: "pointer",
             textDecoration: "none",
             flexShrink: 0,
@@ -191,20 +189,25 @@ export function WorkspaceCard({
           <LayoutDashboard size={16} />
         </a>
       )}
-      <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" />
-      <IconMenu icon={<ExternalLink size={16} />} items={openItems} title="Open" />
-      <IconMenu icon={<MoreVertical size={16} />} items={actionItems} title="Actions" />
+      <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" color={btnColor} />
+      <IconMenu icon={<ExternalLink size={16} />} items={openItems} title="Open" color={btnColor} />
+      <IconMenu icon={<MoreVertical size={16} />} items={actionItems} title="Actions" color={btnColor} />
     </div>
   );
 
 
+  const tint = isUnhealthy
+    ? { borderLeft: "3px solid var(--yellow)", background: "color-mix(in srgb, var(--yellow) 6%, var(--surface))" }
+    : isRunning
+      ? { borderLeft: "3px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 6%, var(--surface))" }
+      : {};
+
   return (
-    <div style={isUnhealthy ? unhealthyCard : card}>
+    <div style={{ ...card, ...tint }}>
       {/* Mobile: existing stacked layout */}
       <div className="card-mobile">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-            <StatusDot status={workspace.status} healthy={workspace.healthy} />
             <span style={{ fontWeight: 600, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "18ch" }}>{workspace.name}</span>
             <StatusText status={workspace.status} healthy={workspace.healthy} />
           </div>
@@ -213,19 +216,16 @@ export function WorkspaceCard({
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <span style={dim}>{workspace.buildAge} ago</span>
           <span style={dim}>{workspace.templateName}</span>
-          {workspace.outdated && <span style={dim}>Outdated</span>}
         </div>
       </div>
 
       {/* Desktop: horizontal single-row layout */}
       <div className="card-desktop">
-        <StatusDot status={workspace.status} healthy={workspace.healthy} />
         <div style={{ fontWeight: 600, fontSize: 15, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "18ch" }}>{workspace.name}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0, marginLeft: 6 }}>
           <StatusText status={workspace.status} healthy={workspace.healthy} />
           <span style={dim}>{workspace.buildAge} ago</span>
           <span style={dim}>{workspace.templateName}</span>
-          {workspace.outdated && <span style={dim}>Outdated</span>}
         </div>
         <div style={{ flexShrink: 0, marginLeft: 14 }}>
           {actionButtons}

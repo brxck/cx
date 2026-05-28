@@ -12,10 +12,10 @@ export interface MenuItem {
 const triggerBtn: React.CSSProperties = {
   width: 32,
   height: 32,
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "var(--surface-hover)",
-  color: "var(--text-dim)",
+  borderRadius: "var(--radius)",
+  border: "none",
+  background: "transparent",
+  color: "var(--accent)",
   fontSize: 15,
   cursor: "pointer",
   display: "flex",
@@ -30,7 +30,7 @@ const menuStyle: React.CSSProperties = {
   right: 0,
   background: "var(--surface)",
   border: "1px solid var(--border)",
-  borderRadius: 8,
+  borderRadius: "var(--radius)",
   padding: 4,
   zIndex: 10,
   minWidth: 150,
@@ -43,18 +43,18 @@ const itemStyle: React.CSSProperties = {
   gap: 8,
   width: "100%",
   padding: "8px 12px",
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 500,
   background: "none",
   border: "none",
-  borderRadius: 6,
+  borderRadius: "var(--radius)",
   cursor: "pointer",
   textAlign: "left",
   whiteSpace: "nowrap",
   textDecoration: "none",
 };
 
-export function IconMenu({ icon, items, title }: { icon: React.ReactNode; items: MenuItem[]; title?: string }) {
+export function IconMenu({ icon, items, title, color }: { icon: React.ReactNode; items: MenuItem[]; title?: string; color?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -73,7 +73,7 @@ export function IconMenu({ icon, items, title }: { icon: React.ReactNode; items:
 
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-      <button style={triggerBtn} onClick={() => setOpen(!open)} title={title}>
+      <button style={{ ...triggerBtn, ...(color ? { color } : {}) }} onClick={() => setOpen(!open)} title={title}>
         {icon}
       </button>
       {open && (

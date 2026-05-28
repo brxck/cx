@@ -19,13 +19,14 @@ const step: React.CSSProperties = {
 };
 
 const dot: React.CSSProperties = {
-  width: 24,
-  height: 24,
-  borderRadius: "50%",
+  width: 22,
+  height: 22,
+  borderRadius: "var(--radius)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 12,
+  fontSize: 11,
+  fontFamily: "inherit",
   flexShrink: 0,
   marginTop: 1,
 };
@@ -35,10 +36,10 @@ const logBox: React.CSSProperties = {
   padding: "8px 10px",
   background: "var(--bg)",
   border: "1px solid var(--border)",
-  borderRadius: 8,
+  borderRadius: "var(--radius)",
   maxHeight: 200,
   overflow: "auto",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontFamily: "inherit",
   fontSize: 11,
   lineHeight: 1.5,
   color: "var(--text-dim)",
@@ -87,10 +88,10 @@ export function ProgressSteps({
               {isError ? "!" : isDone ? "\u2713" : isActive ? "\u00B7\u00B7" : "\u2713"}
             </div>
             <div>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>
+              <div style={{ fontWeight: 500, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 {STAGE_LABELS[event.stage] ?? event.stage}
               </div>
-              <div style={{ color: "var(--text-dim)", fontSize: 13 }}>
+              <div style={{ color: "var(--text-dim)", fontSize: 12 }}>
                 {event.message}
               </div>
             </div>

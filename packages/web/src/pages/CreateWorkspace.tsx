@@ -8,7 +8,10 @@ const backBtn: React.CSSProperties = {
   background: "none",
   border: "none",
   color: "var(--accent)",
-  fontSize: 15,
+  fontSize: 13,
+  fontFamily: "inherit",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
   cursor: "pointer",
   padding: "8px 0",
   marginBottom: 8,
@@ -16,18 +19,20 @@ const backBtn: React.CSSProperties = {
 
 const input: React.CSSProperties = {
   width: "100%",
-  padding: "12px 16px",
-  borderRadius: 8,
+  padding: "10px 14px",
+  borderRadius: "var(--radius)",
   border: "1px solid var(--border)",
   background: "var(--surface)",
   color: "var(--text)",
-  fontSize: 16,
+  fontSize: 14,
+  fontFamily: "inherit",
+  letterSpacing: "0.02em",
   outline: "none",
 };
 
 const templateCard: React.CSSProperties = {
-  padding: "14px 16px",
-  borderRadius: 8,
+  padding: "12px 14px",
+  borderRadius: "var(--radius)",
   border: "1px solid var(--border)",
   background: "var(--surface)",
   marginBottom: 8,
@@ -38,24 +43,28 @@ const templateCardSelected: React.CSSProperties = {
   ...templateCard,
   border: "1px solid var(--accent)",
   background: "var(--surface-hover)",
+  boxShadow: "0 0 8px rgba(34, 238, 136, 0.15)",
 };
 
 const createBtn: React.CSSProperties = {
   width: "100%",
-  padding: "14px",
-  borderRadius: 10,
-  border: "none",
-  background: "var(--accent)",
-  color: "#fff",
-  fontSize: 16,
-  fontWeight: 600,
+  padding: "12px",
+  borderRadius: "var(--radius)",
+  border: "1px solid var(--accent)",
+  background: "transparent",
+  color: "var(--accent)",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
   cursor: "pointer",
   marginTop: 16,
 };
 
 const createBtnDisabled: React.CSSProperties = {
   ...createBtn,
-  opacity: 0.5,
+  opacity: 0.3,
   cursor: "not-allowed",
 };
 
@@ -87,7 +96,7 @@ export function CreateWorkspace() {
 
     return (
       <div className="create-page">
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
           {state === "done"
             ? "Workspace Ready"
             : state === "error"
@@ -129,15 +138,15 @@ export function CreateWorkspace() {
   return (
     <div className="create-page">
       <button style={backBtn} onClick={() => navigate("/")}>
-        &larr; Back
+        ← back
       </button>
 
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
         Create Workspace
       </h2>
 
       <div style={{ marginBottom: 20 }}>
-        <label style={{ display: "block", fontSize: 13, color: "var(--text-dim)", marginBottom: 8 }}>
+        <label style={{ display: "block", fontSize: 11, color: "var(--text-dim)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
           Template
         </label>
         {templatesLoading ? (
@@ -153,8 +162,8 @@ export function CreateWorkspace() {
               style={selectedTemplate === t.name ? templateCardSelected : templateCard}
               onClick={() => handleSelectTemplate(t.name)}
             >
-              <div style={{ fontWeight: 500, fontSize: 15 }}>{t.name}</div>
-              <div style={{ color: "var(--text-dim)", fontSize: 13, marginTop: 2 }}>
+              <div style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</div>
+              <div style={{ color: "var(--text-dim)", fontSize: 12, marginTop: 2 }}>
                 {t.coder.template} &middot; {t.type}
                 {t.source === "project" && " \u00B7 project"}
               </div>
@@ -164,7 +173,7 @@ export function CreateWorkspace() {
       </div>
 
       <div style={{ marginBottom: 8 }}>
-        <label style={{ display: "block", fontSize: 13, color: "var(--text-dim)", marginBottom: 8 }}>
+        <label style={{ display: "block", fontSize: 11, color: "var(--text-dim)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
           Workspace Name
         </label>
         <input
