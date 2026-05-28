@@ -1,0 +1,42 @@
+/* Dashboard page */
+.dashboard-page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 16px env(safe-area-inset-bottom);
+  min-height: 100dvh;
+}
+
+@media (min-width: 768px) {
+  .dashboard-page {
+    max-width: 900px;
+    padding: 24px 32px env(safe-area-inset-bottom);
+  }
+}
+
+/* Card internal layout */
+.card-mobile { display: block; }
+.card-desktop { display: none; }
+
+@media (min-width: 768px) {
+  .card-mobile { display: none; }
+  .card-desktop {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+}
+
+/* CreateWorkspace — stays narrow */
+.create-page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 16px env(safe-area-inset-bottom);
+  min-height: 100dvh;
+}
+
+@media (min-width: 768px) {
+  .create-page {
+    max-width: 520px;
+    padding: 32px 24px env(safe-area-inset-bottom);
+  }
+}

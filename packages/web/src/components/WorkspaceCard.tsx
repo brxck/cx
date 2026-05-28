@@ -1,7 +1,7 @@
 import { useState, useEffect, type SyntheticEvent } from "react";
 import type { WorkspaceInfo, AppEntry } from "../api";
 import { stopWorkspace, startWorkspace, fetchApps, tearDown, streamUpdate, streamRestart } from "../api";
-import { StatusBadge } from "./StatusBadge";
+import { StatusDot, StatusText } from "./StatusBadge";
 import { IconMenu, type MenuItem } from "./IconMenu";
 import { TerminalSquare, ExternalLink, MoreVertical, LayoutDashboard, RefreshCw, Square, Play, Download, Trash2 } from "lucide-react";
 import type { UpEvent } from "../api";
@@ -164,58 +164,72 @@ export function WorkspaceCard({
     });
   }
 
+  const actionButtons = (
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      {apps && (
+        <a
+          href={apps.dashboard}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Dashboard"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            color: "var(--text-dim)",
+            background: "var(--surface-hover)",
+            border: "1px solid var(--border)",
+            cursor: "pointer",
+            textDecoration: "none",
+            flexShrink: 0,
+            fontSize: 15,
+          }}
+        >
+          <LayoutDashboard size={16} />
+        </a>
+      )}
+      <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" />
+      <IconMenu icon={<ExternalLink size={16} />} items={openItems} title="Open" />
+      <IconMenu icon={<MoreVertical size={16} />} items={actionItems} title="Actions" />
+    </div>
+  );
+
+
   return (
     <div style={isUnhealthy ? unhealthyCard : card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
-            {workspace.name}
+      {/* Mobile: existing stacked layout */}
+      <div className="card-mobile">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+            <StatusDot status={workspace.status} healthy={workspace.healthy} />
+            <span style={{ fontWeight: 600, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "18ch" }}>{workspace.name}</span>
+            <StatusText status={workspace.status} healthy={workspace.healthy} />
           </div>
-          <StatusBadge status={workspace.status} healthy={workspace.healthy} />
+          {actionButtons}
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {apps && (
-            <a
-              href={apps.dashboard}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Dashboard"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                color: "var(--text-dim)",
-                background: "var(--surface-hover)",
-                border: "1px solid var(--border)",
-                cursor: "pointer",
-                textDecoration: "none",
-                flexShrink: 0,
-                fontSize: 15,
-              }}
-            >
-              <LayoutDashboard size={16} />
-            </a>
-          )}
-          <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" />
-          <IconMenu icon={<ExternalLink size={16} />} items={openItems} title="Open" />
-          <IconMenu icon={<MoreVertical size={16} />} items={actionItems} title="Actions" />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <span style={dim}>{workspace.buildAge} ago</span>
+          <span style={dim}>{workspace.templateName}</span>
+          {workspace.outdated && <span style={dim}>Outdated</span>}
         </div>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <span style={dim}>{workspace.templateName}</span>
-        <span style={dim}>{workspace.buildAge} ago</span>
-        {workspace.sessions.length > 0 && (
-          <span style={dim}>
-            {workspace.sessions.length} session{workspace.sessions.length !== 1 ? "s" : ""}
-          </span>
-        )}
-        {workspace.outdated && (
-          <span style={dim}>Outdated</span>
-        )}
+      {/* Desktop: horizontal single-row layout */}
+      <div className="card-desktop">
+        <StatusDot status={workspace.status} healthy={workspace.healthy} />
+        <div style={{ fontWeight: 600, fontSize: 15, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "18ch" }}>{workspace.name}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0, marginLeft: 6 }}>
+          <StatusText status={workspace.status} healthy={workspace.healthy} />
+          <span style={dim}>{workspace.buildAge} ago</span>
+          <span style={dim}>{workspace.templateName}</span>
+          {workspace.outdated && <span style={dim}>Outdated</span>}
+        </div>
+        <div style={{ flexShrink: 0, marginLeft: 14 }}>
+          {actionButtons}
+        </div>
       </div>
     </div>
   );

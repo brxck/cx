@@ -7,24 +7,42 @@ const STATUS_STYLES: Record<string, { color: string; label: string }> = {
   unknown: { color: "var(--text-dim)", label: "Unknown" },
 };
 
-export function StatusBadge({ status, healthy }: { status: string; healthy?: boolean }) {
+function useStatusInfo(status: string, healthy?: boolean) {
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.unknown!;
   const unhealthy = healthy === false && status === "running";
-  const dotColor = unhealthy ? "var(--red)" : s.color;
+  return {
+    dotColor: unhealthy ? "var(--red)" : s.color,
+    textColor: unhealthy ? "var(--red)" : s.color,
+    label: unhealthy ? "Unhealthy" : s.label,
+  };
+}
+
+export function StatusDot({ status, healthy }: { status: string; healthy?: boolean }) {
+  const { dotColor } = useStatusInfo(status, healthy);
+  return (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: dotColor,
+        display: "inline-block",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+export function StatusText({ status, healthy }: { status: string; healthy?: boolean }) {
+  const { textColor, label } = useStatusInfo(status, healthy);
+  return <span style={{ color: textColor, fontSize: 13 }}>{label}</span>;
+}
+
+export function StatusBadge({ status, healthy }: { status: string; healthy?: boolean }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-      <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: dotColor,
-          display: "inline-block",
-        }}
-      />
-      <span style={{ color: unhealthy ? "var(--red)" : s.color, fontSize: 13 }}>
-        {unhealthy ? "Unhealthy" : s.label}
-      </span>
+      <StatusDot status={status} healthy={healthy} />
+      <StatusText status={status} healthy={healthy} />
     </span>
   );
 }

@@ -4,13 +4,6 @@ import { useTemplates } from "../hooks/useTemplates";
 import { useUpStream } from "../hooks/useUpStream";
 import { ProgressSteps } from "../components/ProgressSteps";
 
-const page: React.CSSProperties = {
-  maxWidth: 480,
-  margin: "0 auto",
-  padding: "16px 16px env(safe-area-inset-bottom)",
-  minHeight: "100dvh",
-};
-
 const backBtn: React.CSSProperties = {
   background: "none",
   border: "none",
@@ -93,7 +86,7 @@ export function CreateWorkspace() {
     const currentStage = stageEvents.length > 0 ? stageEvents[stageEvents.length - 1]!.stage : null;
 
     return (
-      <div style={page}>
+      <div className="create-page">
         <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>
           {state === "done"
             ? "Workspace Ready"
@@ -134,7 +127,7 @@ export function CreateWorkspace() {
   const canCreate = selectedTemplate && workspaceName.trim().length > 0;
 
   return (
-    <div style={page}>
+    <div className="create-page">
       <button style={backBtn} onClick={() => navigate("/")}>
         &larr; Back
       </button>

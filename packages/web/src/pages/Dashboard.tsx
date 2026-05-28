@@ -2,13 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { useStatus } from "../hooks/useStatus";
 import { WorkspaceCard } from "../components/WorkspaceCard";
 
-const page: React.CSSProperties = {
-  maxWidth: 480,
-  margin: "0 auto",
-  padding: "16px 16px env(safe-area-inset-bottom)",
-  minHeight: "100dvh",
-};
-
 const header: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -52,7 +45,7 @@ export function Dashboard() {
 
   if (loading && !data) {
     return (
-      <div style={{ ...page, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="dashboard-page" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ color: "var(--text-dim)" }}>Loading...</span>
       </div>
     );
@@ -65,11 +58,12 @@ export function Dashboard() {
     const age = Date.now() - new Date(ws.lastBuildAt).getTime();
     return age <= STALE_STOPPED_MS;
   });
+  workspaces.sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1));
   const running = workspaces.filter((w) => w.status === "running").length;
   const unhealthy = workspaces.filter((w) => w.status === "running" && !w.healthy).length;
 
   return (
-    <div style={page}>
+    <div className="dashboard-page">
       <div style={header}>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>cx</h1>
         <button style={fab} onClick={() => navigate("/create")}>+</button>
