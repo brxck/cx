@@ -63,6 +63,26 @@ export interface UpEvent {
   sessions?: number;
 }
 
+export type TemplateInputKind = "text" | "multiline" | "number" | "confirm" | "select" | "multiselect";
+
+export interface TemplateInputOption {
+  value: string;
+  label: string;
+}
+
+export interface TemplateInputField {
+  name: string;
+  kind: TemplateInputKind;
+  description?: string;
+  placeholder?: string;
+  default?: string | number | boolean | string[];
+  options?: TemplateInputOption[];
+}
+
+export interface TemplateInputsResponse {
+  fields: TemplateInputField[];
+}
+
 export async function fetchStatus(): Promise<StatusResponse> {
   const res = await cxFetch("/api/status");
   if (!res.ok) throw new Error("Failed to fetch status");
@@ -73,6 +93,12 @@ export async function fetchTemplates(): Promise<TemplatesResponse> {
   const res = await cxFetch("/api/templates");
   if (!res.ok) throw new Error("Failed to fetch templates");
   return res.json() as Promise<TemplatesResponse>;
+}
+
+export async function fetchTemplateInputs(template: string): Promise<TemplateInputsResponse> {
+  const res = await cxFetch(`/api/template-inputs?template=${encodeURIComponent(template)}`);
+  if (!res.ok) throw new Error("Failed to fetch template inputs");
+  return res.json() as Promise<TemplateInputsResponse>;
 }
 
 async function* streamSse(path: string, body: unknown): AsyncGenerator<UpEvent> {
@@ -106,8 +132,12 @@ async function* streamSse(path: string, body: unknown): AsyncGenerator<UpEvent> 
   }
 }
 
-export function streamUp(template: string, workspace: string): AsyncGenerator<UpEvent> {
-  return streamSse("/api/up", { template, workspace });
+export function streamUp(
+  template: string,
+  workspace: string,
+  vars?: Record<string, string>,
+): AsyncGenerator<UpEvent> {
+  return streamSse("/api/up", { template, workspace, vars });
 }
 
 export function streamUpdate(workspace: string): AsyncGenerator<UpEvent> {

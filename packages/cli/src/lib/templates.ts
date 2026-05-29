@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdirSync, readdirSync, unlinkSync, existsSync, statSync } from "node:fs";
 import consola from "consola";
-import type { InputHelpers, ResolvedInputs } from "./input.ts";
-import { createInputHelpers } from "./input.ts";
+import type { InputHelpers, ResolvedInputs, InputField } from "./input.ts";
+import { createInputHelpers, createDescribeInputHelpers } from "./input.ts";
 import type { WorkspaceContext } from "./coder.ts";
 
 // ── Types ──
@@ -665,4 +665,27 @@ export async function materializeTemplate(
   }
   const template = await prepared.finalize({ workspace });
   return { template, resolvedInputs: prepared.resolvedInputs };
+}
+
+/**
+ * Describe the inputs a template declares, without prompting — for rendering a
+ * form in non-interactive front-ends (e.g. the web UI). JSON templates expose
+ * their `{{var}}` placeholders as text fields; JS templates are run with
+ * describe-mode helpers that walk the default path (see
+ * `createDescribeInputHelpers` for the conditional-input caveat).
+ */
+export async function describeTemplateInputs(
+  source: TemplateSource,
+  opts: { workspaceName?: string; cliVars?: Record<string, string> } = {},
+): Promise<InputField[]> {
+  if (source.kind === "json") {
+    const { extractVariables } = await import("./variables.ts");
+    return extractVariables(source.config).map((name) => {
+      const v = source.config.variables?.[name];
+      return { name, kind: "text" as const, description: v?.description, default: v?.default };
+    });
+  }
+  const { input, fields } = createDescribeInputHelpers({ cliVars: opts.cliVars });
+  await source.fn({ workspaceName: opts.workspaceName ?? "", input });
+  return fields;
 }

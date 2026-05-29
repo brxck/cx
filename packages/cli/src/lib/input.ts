@@ -39,6 +39,38 @@ export interface MultiSelectOpts extends CommonOpts {
 /** Shape of the `vars` blob persisted in the store for restore. */
 export type ResolvedInputs = Record<string, unknown>;
 
+/** Kinds of inputs a template can declare. */
+export type InputFieldKind = "text" | "multiline" | "number" | "confirm" | "select" | "multiselect";
+
+export interface InputFieldOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Static description of a single input a template declares, extracted by
+ * running the template fn with describe-mode helpers (see
+ * `createDescribeInputHelpers`). Used to render forms in non-interactive
+ * front-ends like the web UI.
+ */
+export interface InputField {
+  name: string;
+  kind: InputFieldKind;
+  description?: string;
+  placeholder?: string;
+  default?: string | number | boolean | string[];
+  /** Present for select / multiselect. */
+  options?: InputFieldOption[];
+}
+
+function normalizeOptions(
+  options: Array<string | { value: string; label?: string }>,
+): InputFieldOption[] {
+  return options.map((o) =>
+    typeof o === "string" ? { value: o, label: o } : { value: o.value, label: o.label ?? o.value },
+  );
+}
+
 export interface InputContext {
   /** Values persisted from a previous run (restore path). Highest priority. */
   persistedVars?: ResolvedInputs;
@@ -84,14 +116,6 @@ export function createInputHelpers(ctx: InputContext = {}): {
 
   function message(name: string, opts: CommonOpts | undefined): string {
     return opts?.description ?? `Value for ${name}`;
-  }
-
-  function normalizeOptions(
-    options: Array<string | { value: string; label?: string }>,
-  ): Array<{ value: string; label: string }> {
-    return options.map((o) =>
-      typeof o === "string" ? { value: o, label: o } : { value: o.value, label: o.label ?? o.value },
-    );
   }
 
   const input: InputHelpers = {
@@ -282,4 +306,73 @@ export function createInputHelpers(ctx: InputContext = {}): {
   };
 
   return { input, resolvedInputs: resolved };
+}
+
+/**
+ * Build input helpers that never prompt. Each call records the input's declared
+ * schema into `fields` and returns a value so the template fn can run to
+ * completion: it prefers a matching `cliVars` value, then `opts.default`, then a
+ * type-appropriate empty value.
+ *
+ * This walks the template's "default path" — an input gated behind a non-default
+ * branch (e.g. only asked when a prior confirm is true) won't be discovered. At
+ * create time such inputs resolve to their own defaults under `interactive: false`.
+ */
+export function createDescribeInputHelpers(opts: { cliVars?: Record<string, string> } = {}): {
+  input: InputHelpers;
+  fields: InputField[];
+} {
+  const cli = opts.cliVars ?? {};
+  const fields: InputField[] = [];
+  const seen = new Set<string>();
+
+  function add(field: InputField): void {
+    if (seen.has(field.name)) return;
+    seen.add(field.name);
+    fields.push(field);
+  }
+
+  const input: InputHelpers = {
+    async text(name, o) {
+      add({ name, kind: "text", description: o?.description, placeholder: o?.placeholder, default: o?.default });
+      return name in cli ? cli[name]! : o?.default ?? "";
+    },
+    async multiline(name, o) {
+      add({ name, kind: "multiline", description: o?.description, placeholder: o?.placeholder, default: o?.default });
+      return name in cli ? cli[name]! : o?.default ?? "";
+    },
+    async number(name, o) {
+      add({ name, kind: "number", description: o?.description, default: o?.default });
+      if (name in cli) {
+        const n = Number(cli[name]);
+        if (Number.isFinite(n)) return n;
+      }
+      return o?.default ?? 0;
+    },
+    async confirm(name, o) {
+      add({ name, kind: "confirm", description: o?.description, default: o?.default });
+      if (name in cli) {
+        const raw = cli[name]!.toLowerCase();
+        if (raw === "true" || raw === "1" || raw === "yes") return true;
+        if (raw === "false" || raw === "0" || raw === "no") return false;
+      }
+      return o?.default ?? false;
+    },
+    async select(name, o) {
+      const options = normalizeOptions(o.options);
+      add({ name, kind: "select", description: o.description, default: o.default, options });
+      if (name in cli) return cli[name]!;
+      return o.default ?? options[0]?.value ?? "";
+    },
+    async multiselect(name, o) {
+      const options = normalizeOptions(o.options);
+      add({ name, kind: "multiselect", description: o.description, default: o.default, options });
+      if (name in cli) {
+        return cli[name]!.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      return o.default ?? [];
+    },
+  };
+
+  return { input, fields };
 }

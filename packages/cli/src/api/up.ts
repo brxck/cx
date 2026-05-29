@@ -41,10 +41,13 @@ export async function handleUp(req: Request): Promise<Response> {
           return;
         }
 
-        // 2. Phase 1 — run fn / substitute vars
+        // 2. Phase 1 — run fn / substitute vars. Non-interactive: the server has
+        // no TTY, so inputs resolve from `vars` → defaults and throw (instead of
+        // hanging on a prompt) when a required value is missing.
         const prepared = await prepareTemplate(source, {
           cliVars: body.vars,
           workspaceName: body.workspace,
+          interactive: false,
         });
 
         // 3. Create/start Coder workspace

@@ -63,6 +63,28 @@ export interface TemplatesResponse {
   templates: TemplateInfo[];
 }
 
+export type TemplateInputKind = "text" | "multiline" | "number" | "confirm" | "select" | "multiselect";
+
+export interface TemplateInputOption {
+  value: string;
+  label: string;
+}
+
+/** A single input a template declares, used to render a create form. */
+export interface TemplateInputField {
+  name: string;
+  kind: TemplateInputKind;
+  description?: string;
+  placeholder?: string;
+  default?: string | number | boolean | string[];
+  /** Present for select / multiselect. */
+  options?: TemplateInputOption[];
+}
+
+export interface TemplateInputsResponse {
+  fields: TemplateInputField[];
+}
+
 export interface AppsResponse {
   dashboard: string;
   terminal: string;

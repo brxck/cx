@@ -8,13 +8,13 @@ export function useUpStream() {
   const [state, setState] = useState<UpState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const start = useCallback(async (template: string, workspace: string) => {
+  const start = useCallback(async (template: string, workspace: string, vars?: Record<string, string>) => {
     setEvents([]);
     setState("streaming");
     setError(null);
 
     try {
-      for await (const event of streamUp(template, workspace)) {
+      for await (const event of streamUp(template, workspace, vars)) {
         setEvents((prev) => [...prev, event]);
 
         if (event.stage === "error") {

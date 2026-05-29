@@ -3,6 +3,7 @@ import { consola } from "consola";
 import pc from "picocolors";
 import { handleStatus } from "../api/status.ts";
 import { handleTemplates } from "../api/templates.ts";
+import { handleTemplateInputs } from "../api/template-inputs.ts";
 import { handleUp } from "../api/up.ts";
 import { handleDown } from "../api/down.ts";
 import { handleStop } from "../api/stop.ts";
@@ -83,6 +84,9 @@ export const serveCommand = defineCommand({
                 break;
               case "/api/templates":
                 response = await handleTemplates();
+                break;
+              case "/api/template-inputs":
+                response = await handleTemplateInputs(req);
                 break;
               case "/api/up":
                 if (req.method !== "POST") {
