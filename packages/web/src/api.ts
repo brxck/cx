@@ -27,6 +27,7 @@ export interface TaskInfo {
   state?: string;
   message?: string;
   prUrl?: string;
+  url?: string;
 }
 
 export interface WorkspaceInfo {
@@ -126,6 +127,7 @@ export interface AppEntry {
 export interface AppsResponse {
   dashboard: string;
   terminal: string;
+  taskUrl?: string;
   apps: AppEntry[];
 }
 

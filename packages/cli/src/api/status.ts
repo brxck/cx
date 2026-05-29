@@ -86,6 +86,7 @@ export async function handleStatus(): Promise<Response> {
     }
     apps.sort((a, b) => a.label.localeCompare(b.label));
     const task = taskMap.get(ws.id);
+    const taskUrlCtx = coderUrl ? { baseUrl: coderUrl, ownerName: ws.owner_name } : undefined;
     return {
       name: ws.name,
       status: workspaceStatus(ws),
@@ -98,7 +99,7 @@ export async function handleStatus(): Promise<Response> {
       dashboard,
       terminal,
       apps,
-      task: task ? coderTaskToInfo(task) : undefined,
+      task: task ? coderTaskToInfo(task, taskUrlCtx) : undefined,
     };
   });
 

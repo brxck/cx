@@ -12,6 +12,8 @@ export interface TaskInfo {
   state?: string;
   message?: string;
   prUrl?: string;
+  /** Coder Task UI URL, e.g. `${baseUrl}/tasks/${owner}/${taskId}`. */
+  url?: string;
 }
 
 export interface WorkspaceInfo {
@@ -64,5 +66,7 @@ export interface TemplatesResponse {
 export interface AppsResponse {
   dashboard: string;
   terminal: string;
+  /** Coder Task UI URL when this workspace backs a task; replaces the dashboard destination. */
+  taskUrl?: string;
   apps: { slug: string; label: string; icon?: string }[];
 }

@@ -355,17 +355,23 @@ export default function Command() {
 
                 <ActionPanel.Section title="Open">
                   <Action
-                    title="Open Coder Dashboard"
+                    title={ws.task?.url ? "Open Coder Task" : "Open Coder Dashboard"}
                     icon={Icon.Globe}
                     shortcut={{ modifiers: ["cmd"], key: "d" }}
                     onAction={async () => {
                       try {
+                        if (ws.task?.url) {
+                          await open(ws.task.url);
+                          return;
+                        }
                         const apps = await getApps(ws.name);
                         await open(apps.dashboard);
                       } catch (err) {
                         await showToast({
                           style: Toast.Style.Failure,
-                          title: "Failed to open dashboard",
+                          title: ws.task?.url
+                            ? "Failed to open task"
+                            : "Failed to open dashboard",
                           message:
                             err instanceof Error ? err.message : String(err),
                         });

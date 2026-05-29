@@ -5,6 +5,7 @@ import pc from "picocolors";
 import {
   getCoderUrl,
   dashboardUrl,
+  resolveTaskUrl,
   openInBrowser,
   openInVSCode,
   listOpenableApps,
@@ -154,8 +155,11 @@ export async function runOpen(opts: RunOpenOpts): Promise<void> {
   if (destination === "default") {
     if (app.kind === "dashboard") {
       const baseUrl = await getCoderUrl();
-      const url = dashboardUrl(baseUrl, ws.owner_name, ws.name);
-      consola.info(`Opening ${pc.bold(ws.name)} in browser...`);
+      const taskUi = await resolveTaskUrl(ws, baseUrl);
+      const url = taskUi ?? dashboardUrl(baseUrl, ws.owner_name, ws.name);
+      consola.info(
+        `Opening ${pc.bold(ws.name)} ${taskUi ? "task" : "dashboard"} in browser...`,
+      );
       await openInBrowser(url);
     } else if (app.kind === "vscode") {
       consola.info(`Opening ${pc.bold(ws.name)} in VS Code...`);
@@ -176,7 +180,11 @@ export async function runOpen(opts: RunOpenOpts): Promise<void> {
 
   const baseUrl = await getCoderUrl();
   const dashboard = dashboardUrl(baseUrl, ws.owner_name, ws.name);
-  const url = app.kind === "dashboard" ? dashboard : `${dashboard}/apps/${app.slug}/`;
+  const taskUi = app.kind === "dashboard" ? await resolveTaskUrl(ws, baseUrl) : undefined;
+  const url =
+    app.kind === "dashboard"
+      ? (taskUi ?? dashboard)
+      : `${dashboard}/apps/${app.slug}/`;
 
   const layouts = getLayoutsByCoderWorkspace(ws.name);
   let cmuxWs: string | undefined;

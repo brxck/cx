@@ -113,7 +113,10 @@ export function taskByWorkspaceId(tasks: CoderTask[]): Map<string, CoderTask> {
 }
 
 /** Project a CoderTask onto the wire-friendly TaskInfo shape. */
-export function coderTaskToInfo(task: CoderTask): TaskInfo {
+export function coderTaskToInfo(
+  task: CoderTask,
+  urlCtx?: { baseUrl: string; ownerName: string },
+): TaskInfo {
   return {
     id: task.id,
     displayName: task.display_name.trim() || task.workspace_name,
@@ -121,7 +124,21 @@ export function coderTaskToInfo(task: CoderTask): TaskInfo {
     state: task.current_state?.state || undefined,
     message: task.current_state?.message || undefined,
     prUrl: task.current_state?.uri || undefined,
+    url: urlCtx ? taskUrl(urlCtx.baseUrl, urlCtx.ownerName, task.id) : undefined,
   };
+}
+
+/**
+ * Resolve the Coder Task UI URL for a workspace, or undefined when it backs no task.
+ * Lists tasks fresh; callers that already have task data should use taskUrl() directly.
+ */
+export async function resolveTaskUrl(
+  ws: CoderWorkspace,
+  baseUrl: string,
+): Promise<string | undefined> {
+  const tasks = await listTasks().catch((): CoderTask[] => []);
+  const task = taskByWorkspaceId(tasks).get(ws.id);
+  return task ? taskUrl(baseUrl, ws.owner_name, task.id) : undefined;
 }
 
 export interface CoderTemplate {
@@ -152,6 +169,11 @@ export async function getCoderUrl(): Promise<string> {
 /** Build dashboard URL for a workspace. */
 export function dashboardUrl(baseUrl: string, ownerName: string, workspaceName: string): string {
   return `${baseUrl}/@${ownerName}/${workspaceName}`;
+}
+
+/** Build the Coder Task UI URL, e.g. `${baseUrl}/tasks/${ownerName}/${taskId}`. */
+export function taskUrl(baseUrl: string, ownerName: string, taskId: string): string {
+  return `${baseUrl}/tasks/${ownerName}/${taskId}`;
 }
 
 /** Derive a display status from the workspace build state. */

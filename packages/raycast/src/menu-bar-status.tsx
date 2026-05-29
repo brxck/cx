@@ -158,7 +158,13 @@ export default function Command() {
         ) : null}
 
         <MenuBarExtra.Section title="Apps">
-          {ws.dashboard ? (
+          {ws.task?.url ? (
+            <MenuBarExtra.Item
+              title="Task"
+              icon={Icon.Globe}
+              onAction={() => open(ws.task!.url!)}
+            />
+          ) : ws.dashboard ? (
             <MenuBarExtra.Item
               title="Dashboard"
               icon={Icon.Globe}

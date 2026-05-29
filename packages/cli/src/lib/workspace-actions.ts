@@ -3,6 +3,7 @@ import pc from "picocolors";
 import { consola } from "consola";
 import {
   dashboardUrl,
+  resolveTaskUrl,
   openInBrowser,
   startWorkspace,
   stopWorkspace,
@@ -82,7 +83,8 @@ export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
     hint: ({ ws, coderBaseUrl }) => dashboardUrl(coderBaseUrl, ws.owner_name, ws.name),
     isAvailable: () => true,
     async run({ ws, coderBaseUrl }) {
-      const url = dashboardUrl(coderBaseUrl, ws.owner_name, ws.name);
+      const taskUi = await resolveTaskUrl(ws, coderBaseUrl);
+      const url = taskUi ?? dashboardUrl(coderBaseUrl, ws.owner_name, ws.name);
       consola.info(`Opening ${pc.underline(url)}`);
       await openInBrowser(url);
     },

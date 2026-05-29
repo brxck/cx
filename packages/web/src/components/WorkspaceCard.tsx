@@ -3,7 +3,7 @@ import type { WorkspaceInfo, AppEntry } from "../api";
 import { stopWorkspace, startWorkspace, fetchApps, tearDown, streamUpdate, streamRestart } from "../api";
 import { StatusText } from "./StatusBadge";
 import { IconMenu, type MenuItem } from "./IconMenu";
-import { TerminalSquare, ExternalLink, MoreVertical, LayoutDashboard, RefreshCw, Square, Play, Download, Trash2 } from "lucide-react";
+import { TerminalSquare, ExternalLink, MoreVertical, Globe, RefreshCw, Square, Play, Download, Trash2 } from "lucide-react";
 import type { UpEvent } from "../api";
 
 const card: React.CSSProperties = {
@@ -162,15 +162,18 @@ export function WorkspaceCard({
 
   const btnColor = isUnhealthy ? "var(--yellow)" : isStopped ? "var(--text-dim)" : "var(--accent)";
 
+  // For task-backed workspaces, the primary destination is the Coder Task UI; otherwise the dashboard.
+  const primaryUrl = workspace.task?.url ?? apps?.dashboard;
+
   const actionButtons = (
     <div style={{ display: "flex", gap: 6, alignItems: "center", color: btnColor, margin: "-6px 0" }}>
-      {apps && (
+      {primaryUrl && (
         <a
           className="icon-btn"
-          href={apps.dashboard}
+          href={primaryUrl}
           target="_blank"
           rel="noopener noreferrer"
-          title="Dashboard"
+          title={workspace.task?.url ? "Task" : "Dashboard"}
           style={{
             display: "flex",
             alignItems: "center",
@@ -187,7 +190,7 @@ export function WorkspaceCard({
             fontSize: 15,
           }}
         >
-          <LayoutDashboard size={16} />
+          <Globe size={16} />
         </a>
       )}
       <IconMenu icon={<TerminalSquare size={16} />} items={sessionItems} title="Sessions" color={btnColor} />

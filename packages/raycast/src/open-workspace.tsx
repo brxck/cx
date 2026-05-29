@@ -41,12 +41,19 @@ interface AppEntry {
 
 function buildAppList(apps: AppsResponse): AppEntry[] {
   const entries: AppEntry[] = [
-    {
-      slug: "dashboard",
-      label: "Dashboard",
-      url: apps.dashboard,
-      icon: Icon.Globe,
-    },
+    apps.taskUrl
+      ? {
+          slug: "task",
+          label: "Task",
+          url: apps.taskUrl,
+          icon: Icon.Globe,
+        }
+      : {
+          slug: "dashboard",
+          label: "Dashboard",
+          url: apps.dashboard,
+          icon: Icon.Globe,
+        },
     {
       slug: "terminal",
       label: "Web Terminal",

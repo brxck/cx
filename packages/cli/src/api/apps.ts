@@ -1,8 +1,12 @@
 import {
   listWorkspaces,
   listOpenableApps,
+  listTasks,
+  taskByWorkspaceId,
   getCoderUrl,
   dashboardUrl,
+  taskUrl,
+  type CoderTask,
 } from "../lib/coder.ts";
 
 export async function handleApps(req: Request): Promise<Response> {
@@ -14,9 +18,10 @@ export async function handleApps(req: Request): Promise<Response> {
   }
 
   try {
-    const [workspaces, coderUrl] = await Promise.all([
+    const [workspaces, coderUrl, tasks] = await Promise.all([
       listWorkspaces(),
       getCoderUrl(),
+      listTasks().catch((): CoderTask[] => []),
     ]);
 
     const ws = workspaces.find((w) => w.name === workspace);
@@ -26,6 +31,8 @@ export async function handleApps(req: Request): Promise<Response> {
 
     const apps = listOpenableApps(ws);
     const dashboard = dashboardUrl(coderUrl, ws.owner_name, ws.name);
+    const task = taskByWorkspaceId(tasks).get(ws.id);
+    const taskUi = task ? taskUrl(coderUrl, ws.owner_name, task.id) : undefined;
 
     // Build terminal URL from the first agent name
     const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
@@ -35,6 +42,7 @@ export async function handleApps(req: Request): Promise<Response> {
     return Response.json({
       dashboard,
       terminal,
+      taskUrl: taskUi,
       apps: apps.map((a) => ({
         slug: a.slug,
         label: a.label,
