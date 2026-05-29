@@ -26,6 +26,8 @@ export interface TaskInfo {
   status: string;
   state?: string;
   message?: string;
+  uri?: string;
+  /** @deprecated Use uri. */
   prUrl?: string;
   url?: string;
 }
@@ -36,6 +38,7 @@ export interface WorkspaceInfo {
   healthy: boolean;
   outdated: boolean;
   buildAge: string;
+  lastBuildAt: string;
   templateName: string;
   sessions: string[];
   task?: TaskInfo;

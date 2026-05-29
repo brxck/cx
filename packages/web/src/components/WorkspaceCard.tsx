@@ -207,6 +207,7 @@ export function WorkspaceCard({
       : {};
 
   const task = workspace.task;
+  const taskLinkUrl = task?.uri ?? task?.prUrl;
 
   return (
     <div className="workspace-card" style={{ ...card, ...tint, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -225,16 +226,16 @@ export function WorkspaceCard({
         </div>
       )}
 
-      {/* PR link */}
-      {task?.prUrl && (
+      {/* Task state URI */}
+      {taskLinkUrl && (
         <a
-          href={task.prUrl}
+          href={taskLinkUrl}
           target="_blank"
           rel="noopener noreferrer"
-          title="Open PR"
+          title="Open task link"
           style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--accent)", textDecoration: "none", fontSize: 12, alignSelf: "flex-start", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
         >
-          <ExternalLink size={12} style={{ flexShrink: 0 }} /> {prLabel(task.prUrl)}
+          <ExternalLink size={12} style={{ flexShrink: 0 }} /> {taskLinkLabel(taskLinkUrl)}
         </a>
       )}
 
@@ -248,8 +249,8 @@ export function WorkspaceCard({
   );
 }
 
-/** Short label for a PR URL, e.g. `Infrastructure #1191`. Falls back to the host path. */
-function prLabel(url: string): string {
+/** Short label for a task state URI. Falls back to the host path. */
+function taskLinkLabel(url: string): string {
   const m = url.match(/github\.com\/[^/]+\/([^/]+)\/pull\/(\d+)/);
   if (m) return `${m[1]} #${m[2]}`;
   return url.replace(/^https?:\/\//, "");

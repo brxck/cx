@@ -44,15 +44,16 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
-/** Second indented line for a task: `↳ <state> · <message>  <pr-url>`. */
+/** Second indented line for a task: `↳ <state> · <message>  <uri>`. */
 function taskDetailLine(task: TaskInfo): string | null {
   const parts: string[] = [];
   if (task.state) parts.push(task.state);
   if (task.message) parts.push(truncate(task.message, 90));
   let line = parts.join(" · ");
-  if (task.prUrl) {
-    const pr = task.prUrl.replace(/^https?:\/\//, "");
-    line = line ? `${line}  ${pr}` : pr;
+  const uri = task.uri ?? task.prUrl;
+  if (uri) {
+    const shortUri = uri.replace(/^https?:\/\//, "");
+    line = line ? `${line}  ${shortUri}` : shortUri;
   }
   return line ? pc.dim("↳ " + line) : null;
 }

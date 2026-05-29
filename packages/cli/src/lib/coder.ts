@@ -117,13 +117,15 @@ export function coderTaskToInfo(
   task: CoderTask,
   urlCtx?: { baseUrl: string; ownerName: string },
 ): TaskInfo {
+  const uri = task.current_state?.uri || undefined;
   return {
     id: task.id,
     displayName: task.display_name.trim() || task.workspace_name,
     status: task.status,
     state: task.current_state?.state || undefined,
     message: task.current_state?.message || undefined,
-    prUrl: task.current_state?.uri || undefined,
+    uri,
+    prUrl: uri,
     url: urlCtx ? taskUrl(urlCtx.baseUrl, urlCtx.ownerName, task.id) : undefined,
   };
 }

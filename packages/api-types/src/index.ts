@@ -11,6 +11,9 @@ export interface TaskInfo {
   status: string;
   state?: string;
   message?: string;
+  /** Coder task state URI. This can point to any external resource. */
+  uri?: string;
+  /** @deprecated Use uri. */
   prUrl?: string;
   /** Coder Task UI URL, e.g. `${baseUrl}/tasks/${owner}/${taskId}`. */
   url?: string;

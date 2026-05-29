@@ -32,7 +32,7 @@ const menuStyle: React.CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: "var(--radius)",
   padding: 4,
-  zIndex: 10,
+  zIndex: 100,
   minWidth: 150,
   boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
 };
