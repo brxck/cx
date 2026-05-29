@@ -22,6 +22,17 @@ export async function handleActivate(req: Request): Promise<Response> {
     );
   }
 
+  // Raise the workspace's window and bring the cmux app to the foreground so the
+  // caller (menu bar / web) actually lands on it. Best-effort: selecting the
+  // workspace already succeeded, so don't fail the request if focusing doesn't.
+  try {
+    const windowId = await cmux.windowIdForWorkspace(layout.cmux_id);
+    if (windowId) await cmux.focusWindow(windowId);
+  } catch {}
+  try {
+    await cmux.activateApp();
+  } catch {}
+
   touchLayout(layout.name);
 
   try {

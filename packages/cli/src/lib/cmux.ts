@@ -159,6 +159,29 @@ export async function selectWorkspace(ref: string): Promise<void> {
   await $`cmux select-workspace --workspace ${ref}`.quiet();
 }
 
+/** Bring a cmux window to the front (within cmux's own window stack). Requires a window UUID. */
+export async function focusWindow(windowId: string): Promise<void> {
+  await $`cmux focus-window --window ${windowId}`.quiet();
+}
+
+/** Resolve the UUID of the window currently hosting a workspace, or null. */
+export async function windowIdForWorkspace(wsRef: string): Promise<string | null> {
+  const result = await $`cmux identify --workspace ${wsRef} --id-format uuids`.quiet();
+  const data = result.json() as { focused?: { window_id?: string } };
+  return data.focused?.window_id ?? null;
+}
+
+/**
+ * Bring the cmux macOS app to the foreground. cmux's focus-window only reorders
+ * windows within the app; it does not raise the app above other apps (e.g. the
+ * browser or the menu bar), so an explicit OS-level activation is needed.
+ * No-op off macOS.
+ */
+export async function activateApp(): Promise<void> {
+  if (process.platform !== "darwin") return;
+  await $`open -b com.cmuxterm.app`.quiet();
+}
+
 /** Close a workspace. */
 export async function closeWorkspace(ref: string): Promise<void> {
   await $`cmux close-workspace --workspace ${ref}`.quiet();
