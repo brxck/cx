@@ -13,7 +13,7 @@ import {
   getCoderUrl,
   type WorkspaceContext,
 } from "../lib/coder.ts";
-import { formatLogForSpinner, printCoderFailure } from "../lib/coder-ui.ts";
+import { printCoderFailure } from "../lib/coder-ui.ts";
 import {
   resolveTemplateSource,
   listTemplateSources,
@@ -188,35 +188,25 @@ async function ensureCoderWorkspace(
         params: coder.parameters,
         preset: coder.preset,
       });
-      const waitHeading = `Waiting for ${pc.bold(name)}`;
-      spinner.start(waitHeading);
-      await waitForWorkspace(name, undefined, (line) =>
-        spinner.message(formatLogForSpinner(waitHeading, line)),
-      );
+      spinner.start(`Waiting for ${pc.bold(name)}`);
+      await waitForWorkspace(name);
       spinner.stop(`Workspace ${pc.bold(name)} created and ready`);
       return;
     }
 
     if (status === "stopped") {
-      const heading = `Starting ${pc.bold(name)}`;
-      spinner.message(heading);
-      await startWorkspace(name, {
-        onLine: (line) => spinner.message(formatLogForSpinner(heading, line)),
-      });
-      const waitHeading = `Waiting for ${pc.bold(name)}`;
-      spinner.message(waitHeading);
-      await waitForWorkspace(name, undefined, (line) =>
-        spinner.message(formatLogForSpinner(waitHeading, line)),
-      );
+      spinner.message(`Starting ${pc.bold(name)}`);
+      // Pass a no-op onLine to suppress the live build-log stream; the error
+      // tail is still captured internally and surfaced on failure.
+      await startWorkspace(name, { onLine: () => {} });
+      spinner.message(`Waiting for ${pc.bold(name)}`);
+      await waitForWorkspace(name);
       spinner.stop(`Workspace ${pc.bold(name)} started and ready`);
       return;
     }
 
-    const waitHeading = `Waiting for ${pc.bold(name)} (${status})`;
-    spinner.message(waitHeading);
-    await waitForWorkspace(name, undefined, (line) =>
-      spinner.message(formatLogForSpinner(waitHeading, line)),
-    );
+    spinner.message(`Waiting for ${pc.bold(name)} (${status})`);
+    await waitForWorkspace(name);
     spinner.stop(`Workspace ${pc.bold(name)} is ready`);
   } catch (err) {
     spinner.error(`Failed to prepare workspace ${pc.bold(name)}`);
