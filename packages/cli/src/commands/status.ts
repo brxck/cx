@@ -3,6 +3,7 @@ import { consola } from "consola";
 import pc from "picocolors";
 import { workspaceStatus, relativeTime, requireCoderLogin, type CoderWorkspace } from "../lib/coder.ts";
 import { type LayoutStatus, gatherStatus } from "../lib/status.ts";
+import type { TaskInfo } from "@cx/api-types";
 
 // ── Rendering ──
 
@@ -37,6 +38,23 @@ function claudeBadge(status: string): string {
 function shortenHome(p: string): string {
   const home = process.env.HOME ?? "";
   return home && p.startsWith(home) ? "~" + p.slice(home.length) : p;
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+/** Second indented line for a task: `↳ <state> · <message>  <pr-url>`. */
+function taskDetailLine(task: TaskInfo): string | null {
+  const parts: string[] = [];
+  if (task.state) parts.push(task.state);
+  if (task.message) parts.push(truncate(task.message, 90));
+  let line = parts.join(" · ");
+  if (task.prUrl) {
+    const pr = task.prUrl.replace(/^https?:\/\//, "");
+    line = line ? `${line}  ${pr}` : pr;
+  }
+  return line ? pc.dim("↳ " + line) : null;
 }
 
 function renderLayoutBox(layout: LayoutStatus): void {
@@ -92,6 +110,16 @@ function renderLayoutBox(layout: LayoutStatus): void {
     lines.push(field("Sessions", layout.sessions.join(", ")));
   }
 
+  // Task
+  if (layout.task) {
+    const t = layout.task;
+    const parts = [t.displayName];
+    if (t.state) parts.push(pc.dim(t.state));
+    lines.push(field("Task", parts.join("  ")));
+    const detail = taskDetailLine(t);
+    if (detail) lines.push(field("", detail));
+  }
+
   // Claude
   if (layout.claudeStatus) {
     lines.push(field("Claude", claudeBadge(layout.claudeStatus)));
@@ -113,7 +141,10 @@ function field(label: string, value: string): string {
   return pc.dim(label.padEnd(10)) + value;
 }
 
-function renderUntracked(workspaces: CoderWorkspace[]): void {
+function renderUntracked(
+  workspaces: CoderWorkspace[],
+  tasks: Map<string, TaskInfo>,
+): void {
   if (workspaces.length === 0) return;
   consola.log("");
   consola.log(pc.dim("Untracked Coder workspaces:"));
@@ -121,9 +152,22 @@ function renderUntracked(workspaces: CoderWorkspace[]): void {
     const status = workspaceStatus(ws);
     const badge = statusBadge(status);
     const age = relativeTime(ws.latest_build.created_at);
-    consola.log(
-      `  ${badge}  ${ws.name.padEnd(22)} ${status.padEnd(10)} ${pc.dim(ws.template_name.padEnd(16))} ${pc.dim(age + " ago")}`,
-    );
+    const task = tasks.get(ws.id);
+
+    if (task) {
+      const visibleLen = `${task.displayName} (${ws.name})`.length;
+      const namePad = " ".repeat(Math.max(1, 23 - visibleLen));
+      const nameCell = `${task.displayName} ${pc.dim(`(${ws.name})`)}`;
+      consola.log(
+        `  ${badge}  ${nameCell}${namePad}${status.padEnd(10)} ${pc.dim(ws.template_name.padEnd(16))} ${pc.dim(age + " ago")}`,
+      );
+      const detail = taskDetailLine(task);
+      if (detail) consola.log(`        ${detail}`);
+    } else {
+      consola.log(
+        `  ${badge}  ${ws.name.padEnd(22)} ${status.padEnd(10)} ${pc.dim(ws.template_name.padEnd(16))} ${pc.dim(age + " ago")}`,
+      );
+    }
   }
 }
 
@@ -203,7 +247,7 @@ export const statusCommand = defineCommand({
     }
 
     if (!args.layout) {
-      renderUntracked(result.untracked);
+      renderUntracked(result.untracked, result.tasksByWorkspaceId);
       renderSummary(
         layoutStatuses,
         result.coderTotal,

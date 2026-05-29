@@ -73,7 +73,7 @@ export function IconMenu({ icon, items, title, color }: { icon: React.ReactNode;
 
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-      <button style={{ ...triggerBtn, ...(color ? { color } : {}) }} onClick={() => setOpen(!open)} title={title}>
+      <button className="icon-btn" style={{ ...triggerBtn, ...(color ? { color } : {}) }} onClick={() => setOpen(!open)} title={title}>
         {icon}
       </button>
       {open && (
@@ -82,6 +82,7 @@ export function IconMenu({ icon, items, title, color }: { icon: React.ReactNode;
             item.href ? (
               <a
                 key={i}
+                className="menu-item"
                 href={item.href}
                 target="_blank"
                 rel="noopener"
@@ -93,6 +94,7 @@ export function IconMenu({ icon, items, title, color }: { icon: React.ReactNode;
             ) : (
               <button
                 key={i}
+                className="menu-item"
                 disabled={item.disabled}
                 style={{
                   ...itemStyle,

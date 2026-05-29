@@ -22,18 +22,33 @@
   }
 }
 
-/* Card internal layout */
-.card-mobile { display: block; }
-.card-desktop { display: none; }
+/* Hover states */
+.icon-btn { transition: opacity 0.15s; }
+.icon-btn:hover { opacity: 0.6; }
 
-@media (min-width: 768px) {
-  .card-mobile { display: none; }
-  .card-desktop {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-}
+.fab-btn { transition: background-color 0.15s, color 0.15s; }
+.fab-btn:hover { background-color: var(--accent) !important; color: var(--bg) !important; }
+
+.workspace-card { transition: filter 0.15s; }
+.workspace-card:hover { filter: brightness(1.3); }
+
+.template-card { transition: background-color 0.15s; }
+.template-card:hover { background-color: var(--surface-hover) !important; }
+
+.btn-accent { transition: background-color 0.15s, color 0.15s; }
+.btn-accent:hover:not(:disabled) { background-color: var(--accent) !important; color: var(--bg) !important; }
+
+.back-btn { transition: opacity 0.15s; }
+.back-btn:hover { opacity: 0.6; }
+
+.menu-item { transition: background-color 0.15s; }
+.menu-item:hover:not(:disabled) { background-color: var(--surface-hover) !important; }
+
+.toggle-seg { transition: background-color 0.15s, color 0.15s; }
+.toggle-seg:hover { color: var(--text) !important; }
+
+.input-field { transition: border-color 0.15s; }
+.input-field:focus { border-color: var(--accent) !important; }
 
 /* CreateWorkspace — stays narrow */
 .create-page {

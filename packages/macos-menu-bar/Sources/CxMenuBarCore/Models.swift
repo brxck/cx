@@ -14,6 +14,31 @@ public struct WorkspaceApp: Codable, Equatable, Sendable {
     }
 }
 
+public struct TaskInfo: Codable, Equatable, Sendable {
+    public var id: String
+    public var displayName: String
+    public var status: String
+    public var state: String?
+    public var message: String?
+    public var prUrl: String?
+
+    public init(
+        id: String,
+        displayName: String,
+        status: String,
+        state: String? = nil,
+        message: String? = nil,
+        prUrl: String? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.status = status
+        self.state = state
+        self.message = message
+        self.prUrl = prUrl
+    }
+}
+
 public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
     public var id: String { name }
 
@@ -28,6 +53,7 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
     public var dashboard: String?
     public var terminal: String?
     public var apps: [WorkspaceApp]?
+    public var task: TaskInfo?
 
     public init(
         name: String,
@@ -40,7 +66,8 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
         sessions: [String],
         dashboard: String? = nil,
         terminal: String? = nil,
-        apps: [WorkspaceApp]? = nil
+        apps: [WorkspaceApp]? = nil,
+        task: TaskInfo? = nil
     ) {
         self.name = name
         self.status = status
@@ -53,6 +80,7 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
         self.dashboard = dashboard
         self.terminal = terminal
         self.apps = apps
+        self.task = task
     }
 }
 

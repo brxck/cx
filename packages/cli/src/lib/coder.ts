@@ -2,6 +2,7 @@ import { $ } from "bun";
 import { consola } from "consola";
 import { sshHost, sshHostWithSession, buildInteractiveSshCommand } from "./ssh.ts";
 import { refreshCacheAsync } from "./workspace-cache.ts";
+import type { TaskInfo } from "@cx/api-types";
 
 export interface CoderWorkspace {
   id: string;
@@ -71,6 +72,56 @@ export function relativeTime(iso: string): string {
 export async function listWorkspaces(): Promise<CoderWorkspace[]> {
   const result = await $`coder list --output json`.quiet();
   return result.json() as Promise<CoderWorkspace[]>;
+}
+
+export interface CoderTask {
+  id: string;
+  display_name: string;
+  workspace_id: string;
+  workspace_name: string;
+  workspace_status: string;
+  status: string;
+  current_state: { timestamp: string; state: string; message: string; uri: string } | null;
+}
+
+/**
+ * Fetch the current user's Coder Tasks (all states) via `coder task list --output json`.
+ * The license warning Coder may print goes to stderr, so stdout parses cleanly.
+ */
+export async function listTasks(): Promise<CoderTask[]> {
+  const result = await $`coder task list --output json`.quiet();
+  return result.json() as Promise<CoderTask[]>;
+}
+
+/**
+ * Index tasks by their backing workspace id. When a workspace has multiple
+ * tasks, keep the one with the latest current_state.timestamp (last seen wins on tie).
+ */
+export function taskByWorkspaceId(tasks: CoderTask[]): Map<string, CoderTask> {
+  const map = new Map<string, CoderTask>();
+  for (const task of tasks) {
+    const existing = map.get(task.workspace_id);
+    if (!existing) {
+      map.set(task.workspace_id, task);
+      continue;
+    }
+    const a = existing.current_state?.timestamp ?? "";
+    const b = task.current_state?.timestamp ?? "";
+    if (b >= a) map.set(task.workspace_id, task);
+  }
+  return map;
+}
+
+/** Project a CoderTask onto the wire-friendly TaskInfo shape. */
+export function coderTaskToInfo(task: CoderTask): TaskInfo {
+  return {
+    id: task.id,
+    displayName: task.display_name.trim() || task.workspace_name,
+    status: task.status,
+    state: task.current_state?.state || undefined,
+    message: task.current_state?.message || undefined,
+    prUrl: task.current_state?.uri || undefined,
+  };
 }
 
 export interface CoderTemplate {

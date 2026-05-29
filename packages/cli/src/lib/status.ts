@@ -1,9 +1,14 @@
 import {
   type CoderWorkspace,
+  type CoderTask,
   listWorkspaces as listCoderWorkspaces,
+  listTasks,
+  taskByWorkspaceId,
+  coderTaskToInfo,
   workspaceStatus,
   relativeTime,
 } from "./coder.ts";
+import type { TaskInfo } from "@cx/api-types";
 import {
   type CmuxWorkspace,
   type SidebarState,
@@ -44,11 +49,14 @@ export interface LayoutStatus {
   claudeStatus: string | null;
   portForwards: string[];
   sessions: string[];
+  task?: TaskInfo;
 }
 
 export interface StatusResult {
   layouts: LayoutStatus[];
   untracked: CoderWorkspace[];
+  /** Task info keyed by Coder workspace id, for enriching untracked workspaces. */
+  tasksByWorkspaceId: Map<string, TaskInfo>;
   coderTotal: number;
   coderRunning: number;
   portForwardCount: number;
@@ -88,6 +96,7 @@ export function buildLayoutStatuses(
   cmuxWorkspaces: CmuxWorkspace[],
   sidebarStates: Map<string, SidebarState>,
   portForwards: Map<string, string[]>,
+  tasksByWorkspaceId: Map<string, TaskInfo>,
 ): LayoutStatus[] {
   const coderByName = new Map(coderWorkspaces.map((w) => [w.name, w]));
   const cmuxByRef = new Map(cmuxWorkspaces.map((w) => [w.ref, w]));
@@ -98,6 +107,7 @@ export function buildLayoutStatuses(
     const sidebar = sidebarStates.get(layout.name);
     const sessions = getSessionsForLayout(layout.name);
     const ports = portForwards.get(layout.coder_ws) ?? [];
+    const task = coder ? tasksByWorkspaceId.get(coder.id) : undefined;
 
     return {
       name: layout.name,
@@ -121,6 +131,7 @@ export function buildLayoutStatuses(
       claudeStatus: sidebar?.claudeStatus ?? null,
       portForwards: ports,
       sessions,
+      task,
     };
   });
 }
@@ -129,7 +140,7 @@ export function buildLayoutStatuses(
 export async function gatherStatus(): Promise<StatusResult> {
   const cmuxAlive = await cmuxPing();
 
-  const [layouts, coderWorkspaces, cmuxWorkspaces, portForwards] =
+  const [layouts, coderWorkspaces, cmuxWorkspaces, portForwards, tasks] =
     await Promise.all([
       Promise.resolve(getAllLayouts()),
       listCoderWorkspaces().catch((): CoderWorkspace[] => []),
@@ -137,7 +148,13 @@ export async function gatherStatus(): Promise<StatusResult> {
         ? listCmuxWorkspaces().catch((): CmuxWorkspace[] => [])
         : Promise.resolve([] as CmuxWorkspace[]),
       detectPortForwardMap(),
+      listTasks().catch((): CoderTask[] => []),
     ]);
+
+  const tasksByWorkspaceId = new Map<string, TaskInfo>();
+  for (const [wsId, task] of taskByWorkspaceId(tasks)) {
+    tasksByWorkspaceId.set(wsId, coderTaskToInfo(task));
+  }
 
   const sidebarStates = cmuxAlive
     ? await fetchSidebarStates(layouts, cmuxWorkspaces)
@@ -157,6 +174,7 @@ export async function gatherStatus(): Promise<StatusResult> {
     cmuxWorkspaces,
     sidebarStates,
     portForwards,
+    tasksByWorkspaceId,
   );
 
   const trackedCoderNames = new Set(layouts.map((l) => l.coder_ws));
@@ -175,6 +193,7 @@ export async function gatherStatus(): Promise<StatusResult> {
   return {
     layouts: layoutStatuses,
     untracked,
+    tasksByWorkspaceId,
     coderTotal: coderWorkspaces.length,
     coderRunning,
     portForwardCount: pfCount,

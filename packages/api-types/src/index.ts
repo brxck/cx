@@ -5,6 +5,15 @@ export interface WorkspaceApp {
   icon?: string;
 }
 
+export interface TaskInfo {
+  id: string;
+  displayName: string;
+  status: string;
+  state?: string;
+  message?: string;
+  prUrl?: string;
+}
+
 export interface WorkspaceInfo {
   name: string;
   status: string;
@@ -17,6 +26,7 @@ export interface WorkspaceInfo {
   dashboard?: string;
   terminal?: string;
   apps?: WorkspaceApp[];
+  task?: TaskInfo;
 }
 
 export interface LayoutInfo {

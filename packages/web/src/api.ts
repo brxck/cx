@@ -20,6 +20,15 @@ async function cxFetch(path: string, init?: RequestInit): Promise<Response> {
   });
 }
 
+export interface TaskInfo {
+  id: string;
+  displayName: string;
+  status: string;
+  state?: string;
+  message?: string;
+  prUrl?: string;
+}
+
 export interface WorkspaceInfo {
   name: string;
   status: string;
@@ -28,6 +37,7 @@ export interface WorkspaceInfo {
   buildAge: string;
   templateName: string;
   sessions: string[];
+  task?: TaskInfo;
 }
 
 export interface TemplateEntry {

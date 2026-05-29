@@ -1,10 +1,14 @@
 import {
   listWorkspaces as listCoderWorkspaces,
+  listTasks,
+  taskByWorkspaceId,
+  coderTaskToInfo,
   workspaceStatus,
   relativeTime,
   getCoderUrl,
   dashboardUrl,
   type CoderWorkspace,
+  type CoderTask,
 } from "../lib/coder.ts";
 import { getAllLayouts, getSessionsForLayout } from "../lib/store.ts";
 import type { WorkspaceInfo, LayoutInfo, WorkspaceApp } from "@cx/api-types";
@@ -12,11 +16,14 @@ import type { WorkspaceInfo, LayoutInfo, WorkspaceApp } from "@cx/api-types";
 export type { WorkspaceInfo, LayoutInfo };
 
 export async function handleStatus(): Promise<Response> {
-  const [coderWorkspaces, layouts, coderUrl] = await Promise.all([
+  const [coderWorkspaces, layouts, coderUrl, tasks] = await Promise.all([
     listCoderWorkspaces().catch((): CoderWorkspace[] => []),
     Promise.resolve(getAllLayouts()),
     getCoderUrl().catch(() => ""),
+    listTasks().catch((): CoderTask[] => []),
   ]);
+
+  const taskMap = taskByWorkspaceId(tasks);
 
   // Build session lookup from tracked layouts
   const sessionsByCoderWs = new Map<string, string[]>();
@@ -78,6 +85,7 @@ export async function handleStatus(): Promise<Response> {
       }
     }
     apps.sort((a, b) => a.label.localeCompare(b.label));
+    const task = taskMap.get(ws.id);
     return {
       name: ws.name,
       status: workspaceStatus(ws),
@@ -90,6 +98,7 @@ export async function handleStatus(): Promise<Response> {
       dashboard,
       terminal,
       apps,
+      task: task ? coderTaskToInfo(task) : undefined,
     };
   });
 

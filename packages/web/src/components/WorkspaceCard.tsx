@@ -163,9 +163,10 @@ export function WorkspaceCard({
   const btnColor = isUnhealthy ? "var(--yellow)" : isStopped ? "var(--text-dim)" : "var(--accent)";
 
   const actionButtons = (
-    <div style={{ display: "flex", gap: 6, alignItems: "center", color: btnColor }}>
+    <div style={{ display: "flex", gap: 6, alignItems: "center", color: btnColor, margin: "-6px 0" }}>
       {apps && (
         <a
+          className="icon-btn"
           href={apps.dashboard}
           target="_blank"
           rel="noopener noreferrer"
@@ -202,35 +203,51 @@ export function WorkspaceCard({
       ? { borderLeft: "3px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 6%, var(--surface))" }
       : {};
 
+  const task = workspace.task;
+
   return (
-    <div style={{ ...card, ...tint }}>
-      {/* Mobile: existing stacked layout */}
-      <div className="card-mobile">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-            <span style={{ fontWeight: 600, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "18ch" }}>{workspace.name}</span>
-            <StatusText status={workspace.status} healthy={workspace.healthy} />
-          </div>
-          {actionButtons}
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <span style={dim}>{workspace.buildAge} ago</span>
-          <span style={dim}>{workspace.templateName}</span>
-        </div>
+    <div className="workspace-card" style={{ ...card, ...tint, display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Workspace name + actions */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <span style={{ fontWeight: 600, fontSize: 16, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {workspace.name}
+        </span>
+        {actionButtons}
       </div>
 
-      {/* Desktop: horizontal single-row layout */}
-      <div className="card-desktop">
-        <div style={{ fontWeight: 600, fontSize: 15, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "18ch" }}>{workspace.name}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0, marginLeft: 6 }}>
-          <StatusText status={workspace.status} healthy={workspace.healthy} />
-          <span style={dim}>{workspace.buildAge} ago</span>
-          <span style={dim}>{workspace.templateName}</span>
+      {/* Task title */}
+      {task && (
+        <div style={{ fontSize: 13, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {task.displayName}
         </div>
-        <div style={{ flexShrink: 0, marginLeft: 14 }}>
-          {actionButtons}
-        </div>
+      )}
+
+      {/* PR link */}
+      {task?.prUrl && (
+        <a
+          href={task.prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open PR"
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--accent)", textDecoration: "none", fontSize: 12, alignSelf: "flex-start", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          <ExternalLink size={12} style={{ flexShrink: 0 }} /> {prLabel(task.prUrl)}
+        </a>
+      )}
+
+      {/* Status + timestamp + template */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+        <StatusText status={workspace.status} healthy={workspace.healthy} />
+        <span style={dim}>{workspace.buildAge} ago</span>
+        <span style={dim}>{workspace.templateName}</span>
       </div>
     </div>
   );
+}
+
+/** Short label for a PR URL, e.g. `Infrastructure #1191`. Falls back to the host path. */
+function prLabel(url: string): string {
+  const m = url.match(/github\.com\/[^/]+\/([^/]+)\/pull\/(\d+)/);
+  if (m) return `${m[1]} #${m[2]}`;
+  return url.replace(/^https?:\/\//, "");
 }

@@ -9,6 +9,10 @@ final class CxMenuBarCoreTests: XCTestCase {
         XCTAssertEqual(status.workspaces[0].name, "alpha")
         XCTAssertEqual(status.workspaces[0].apps?.first?.label, "App One")
         XCTAssertEqual(status.workspaces[0].apps?.first?.icon, "https://coder.example/icon.png")
+        XCTAssertEqual(status.workspaces[0].task?.displayName, "Review and rebase Infrastructure PR #1147")
+        XCTAssertEqual(status.workspaces[0].task?.state, "idle")
+        XCTAssertEqual(status.workspaces[0].task?.prUrl, "https://github.com/owner/Infrastructure/pull/1147")
+        XCTAssertNil(status.workspaces[1].task)
         XCTAssertEqual(status.layouts.first?.cmuxId, "cmux-alpha-old")
         XCTAssertEqual(status.layouts.first?.type, "ephemeral")
     }
@@ -151,7 +155,15 @@ private let sampleStatusJSON = """
           "url": "https://app-one.example",
           "icon": "https://coder.example/icon.png"
         }
-      ]
+      ],
+      "task": {
+        "id": "task-alpha",
+        "displayName": "Review and rebase Infrastructure PR #1147",
+        "status": "active",
+        "state": "idle",
+        "message": "Draft PR #1191 opened and awaiting review",
+        "prUrl": "https://github.com/owner/Infrastructure/pull/1147"
+      }
     },
     {
       "name": "beta",

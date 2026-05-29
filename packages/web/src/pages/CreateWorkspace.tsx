@@ -108,6 +108,7 @@ export function CreateWorkspace() {
 
         {state === "done" && (
           <button
+            className="btn-accent"
             style={createBtn}
             onClick={() => navigate("/")}
           >
@@ -121,6 +122,7 @@ export function CreateWorkspace() {
               {error}
             </div>
             <button
+              className="btn-accent"
               style={{ ...createBtn, background: "var(--surface-hover)" }}
               onClick={() => { reset(); }}
             >
@@ -137,7 +139,7 @@ export function CreateWorkspace() {
 
   return (
     <div className="create-page">
-      <button style={backBtn} onClick={() => navigate("/")}>
+      <button className="back-btn" style={backBtn} onClick={() => navigate("/")}>
         ← back
       </button>
 
@@ -159,6 +161,7 @@ export function CreateWorkspace() {
           templates.map((t) => (
             <div
               key={t.name}
+              className="template-card"
               style={selectedTemplate === t.name ? templateCardSelected : templateCard}
               onClick={() => handleSelectTemplate(t.name)}
             >
@@ -177,6 +180,7 @@ export function CreateWorkspace() {
           Workspace Name
         </label>
         <input
+          className="input-field"
           style={input}
           value={workspaceName}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWorkspaceName(e.target.value)}
@@ -187,6 +191,7 @@ export function CreateWorkspace() {
       </div>
 
       <button
+        className="btn-accent"
         style={canCreate ? createBtn : createBtnDisabled}
         onClick={handleCreate}
         disabled={!canCreate}

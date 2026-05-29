@@ -106,7 +106,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func workspaceMenuItem(_ workspace: WorkspaceInfo, status: StatusResponse) -> NSMenuItem {
         let layout = status.activeLayout(for: workspace.name)
         let suffix = layout.map { " · \($0.name)" } ?? ""
-        let item = NSMenuItem(title: "\(workspace.name)\(suffix)", action: nil, keyEquivalent: "")
+        let title = workspace.task?.displayName ?? workspace.name
+        let item = NSMenuItem(title: "\(title)\(suffix)", action: nil, keyEquivalent: "")
         item.image = circleImage(for: workspace.indicator)
 
         let submenu = NSMenu()
@@ -116,6 +117,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     await self?.model.activateLayout(layout.name) ?? ActionResponse(ok: false, error: "Menu bar app closed")
                 }
             })
+            submenu.addItem(.separator())
+        }
+
+        if let task = workspace.task {
+            submenu.addItem(sectionItem("Task"))
+            var detailParts: [String] = []
+            if let state = task.state, !state.isEmpty { detailParts.append(state) }
+            if let message = task.message, !message.isEmpty {
+                detailParts.append(message.count > 80 ? String(message.prefix(79)) + "…" : message)
+            }
+            let detail = detailParts.joined(separator: " · ")
+            submenu.addItem(disabledItem(detail.isEmpty ? task.displayName : detail))
+            if let prUrl = task.prUrl, !prUrl.isEmpty {
+                submenu.addItem(urlItem("Open PR", symbol: "arrow.up.right.square", url: prUrl))
+            }
             submenu.addItem(.separator())
         }
 
