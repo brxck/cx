@@ -34,9 +34,15 @@
   transition: filter 0.15s;
 }
 
-.workspace-card:hover,
-.workspace-card:focus-within {
+.workspace-card:hover {
   z-index: 20;
+}
+
+/* A card with an open menu (focus-within) must outrank a merely-hovered
+   sibling, otherwise the hovered row — sharing the same z-index — wins on
+   DOM order and paints over the menu trapped in this card's stacking context. */
+.workspace-card:focus-within {
+  z-index: 30;
 }
 
 .workspace-card:hover { filter: brightness(1.3); }
