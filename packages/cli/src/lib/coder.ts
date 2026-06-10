@@ -1,5 +1,8 @@
 import { $ } from "bun";
 import { consola } from "consola";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { chmodSync } from "node:fs";
 import { sshHost, sshHostWithSession, buildInteractiveSshCommand } from "./ssh.ts";
 import { refreshCacheAsync } from "./workspace-cache.ts";
 import type { TaskInfo, AppStatus } from "@cx/api-types";
@@ -174,6 +177,127 @@ export async function listCoderTemplates(): Promise<CoderTemplate[]> {
   return raw
     .map((entry) => entry.Template)
     .filter((t) => !t.deprecated);
+}
+
+export interface ListeningPort {
+  /** Process that opened the socket; may be empty if the agent couldn't resolve it. */
+  processName: string;
+  network: string;
+  port: number;
+}
+
+/** Coder/infra processes that are never useful to forward; filtered from discovery. */
+const IGNORED_PORT_PROCESSES = new Set(["tailscaled", "caddy", "mainthread"]);
+
+/** Default Coder CLI config dir per-platform (honours $CODER_CONFIG_DIR). */
+function coderConfigDir(): string {
+  if (process.env.CODER_CONFIG_DIR) return process.env.CODER_CONFIG_DIR;
+  if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", "coderv2");
+  if (process.platform === "win32" && process.env.APPDATA) return join(process.env.APPDATA, "coderv2");
+  return join(homedir(), ".config", "coderv2");
+}
+
+/** Where cx caches its self-minted API token, and the token's server-side name. */
+const CX_TOKEN_FILE = join(homedir(), ".cx", "coder-token");
+const CX_TOKEN_NAME = "cx";
+
+/** Parse the bare token from `coder tokens create` stdout (the token is the last line). */
+function parseMintedToken(stdout: string): string | undefined {
+  return stdout.trim().split(/\r?\n/).filter(Boolean).pop()?.trim();
+}
+
+/**
+ * Mint a least-privilege API token via `coder tokens create` (non-interactive —
+ * prints the token to stdout). Caches under the name `cx` so repeated calls reuse
+ * one token; recovers from a stale name collision and from deployment lifetime caps.
+ */
+async function mintCoderToken(): Promise<string> {
+  const create = (lifetime?: string) => {
+    const args = ["tokens", "create", "-n", CX_TOKEN_NAME, "--scope", "workspace:read"];
+    if (lifetime) args.push("--lifetime", lifetime);
+    return $`coder ${args}`.quiet().nothrow();
+  };
+
+  let res = await create("1y");
+  if (res.exitCode !== 0) {
+    // A `cx` token may already exist from a run whose cache was lost — replace it.
+    await $`coder tokens remove ${CX_TOKEN_NAME}`.quiet().nothrow();
+    res = await create("1y");
+  }
+  if (res.exitCode !== 0) {
+    // The deployment may cap token lifetime — let it choose the default.
+    res = await create();
+  }
+  if (res.exitCode !== 0) {
+    const detail = res.stderr.toString().trim() || res.stdout.toString().trim();
+    throw new Error(`Could not mint a Coder token (\`coder tokens create\`): ${detail}`);
+  }
+  const token = parseMintedToken(res.stdout.toString());
+  if (!token) throw new Error("`coder tokens create` produced no token output");
+
+  await Bun.write(CX_TOKEN_FILE, token);
+  try {
+    chmodSync(CX_TOKEN_FILE, 0o600);
+  } catch {}
+  return token;
+}
+
+/**
+ * Resolve a Coder session token for direct REST calls. Order: $CODER_SESSION_TOKEN,
+ * a file-based `session` in the Coder config dir, a previously cached cx token, then
+ * mint a fresh one. Newer CLIs keep their own token in the OS keyring (not a file),
+ * so cx mints its own scoped token rather than reading the keyring. Pass
+ * `forceMint` to bypass every cached source (used to recover from a 401).
+ */
+async function coderSessionToken(opts?: { forceMint?: boolean }): Promise<string> {
+  if (!opts?.forceMint) {
+    const fromEnv = process.env.CODER_SESSION_TOKEN?.trim();
+    if (fromEnv) return fromEnv;
+    const sessionFile = Bun.file(join(coderConfigDir(), "session"));
+    if (await sessionFile.exists()) {
+      const token = (await sessionFile.text()).trim();
+      if (token) return token;
+    }
+    const cached = Bun.file(CX_TOKEN_FILE);
+    if (await cached.exists()) {
+      const token = (await cached.text()).trim();
+      if (token) return token;
+    }
+  }
+  return mintCoderToken();
+}
+
+/** Pick the primary agent id for a workspace (first connected agent, else the first). */
+export function agentIdForWorkspace(ws: CoderWorkspace): string | undefined {
+  const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
+  return (agents.find((a) => a.status === "connected") ?? agents[0])?.id;
+}
+
+/**
+ * Discover the ports an agent currently sees listening, via Coder's REST API
+ * (`GET /api/v2/workspaceagents/{id}/listening-ports`) — the same source as the
+ * dashboard's "Listening Ports" panel, process names included.
+ */
+export async function listeningPorts(agentId: string): Promise<ListeningPort[]> {
+  const baseUrl = await getCoderUrl();
+  const url = `${baseUrl}/api/v2/workspaceagents/${agentId}/listening-ports`;
+  const fetchWith = (token: string) => fetch(url, { headers: { "Coder-Session-Token": token } });
+
+  let res = await fetchWith(await coderSessionToken());
+  if (res.status === 401) {
+    // Cached/minted token expired or was revoked — mint a fresh one and retry once.
+    res = await fetchWith(await coderSessionToken({ forceMint: true }));
+  }
+  if (!res.ok) {
+    throw new Error(`Coder listening-ports API returned ${res.status}: ${(await res.text()).trim()}`);
+  }
+  const data = (await res.json()) as {
+    ports?: Array<{ process_name?: string; network?: string; port: number }>;
+  };
+  return (data.ports ?? [])
+    .map((p) => ({ processName: p.process_name?.trim() ?? "", network: p.network ?? "tcp", port: p.port }))
+    .filter((p) => !IGNORED_PORT_PROCESSES.has(p.processName.toLowerCase()))
+    .sort((a, b) => a.port - b.port);
 }
 
 /** Get the Coder deployment URL from `coder whoami`. */

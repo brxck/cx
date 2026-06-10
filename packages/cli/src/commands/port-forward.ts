@@ -7,7 +7,10 @@ import {
   buildWorkspaceContext,
   getCoderUrl,
   listWorkspaces as listCoderWorkspaces,
+  agentIdForWorkspace,
+  listeningPorts,
   type CoderWorkspace,
+  type ListeningPort,
 } from "../lib/coder.ts";
 import { pickWorkspace } from "../lib/workspace-picker.ts";
 import { getLayoutsByCoderWorkspace } from "../lib/store.ts";
@@ -105,16 +108,50 @@ function startUdpForwarding(coderWsName: string, mappings: string[]): void {
   consola.info(`UDP port forwarding started: ${pc.dim(mappings.join(", "))} (pid ${proc.pid})`);
 }
 
+/** Discover listening ports on a workspace via the Coder API and print them. */
+async function printListeningPorts(ws: CoderWorkspace): Promise<ListeningPort[]> {
+  const agentId = agentIdForWorkspace(ws);
+  if (!agentId) {
+    consola.warn(`No connected agent for ${pc.bold(ws.name)} — is it running?`);
+    return [];
+  }
+  let ports: ListeningPort[];
+  try {
+    ports = await listeningPorts(agentId);
+  } catch (err) {
+    consola.error((err as Error).message);
+    return [];
+  }
+  if (ports.length === 0) {
+    consola.info(`No listening ports detected on ${pc.bold(ws.name)}.`);
+    return [];
+  }
+  consola.info(`Listening ports on ${pc.bold(ws.name)}:`);
+  const width = Math.max(...ports.map((p) => String(p.port).length));
+  for (const p of ports) {
+    const proc = p.processName || pc.dim("(unknown)");
+    consola.log(`  ${pc.bold(String(p.port).padStart(width))}  ${pc.dim(p.network)}  ${proc}`);
+  }
+  return ports;
+}
+
 export interface RunPortsOpts {
   ws: CoderWorkspace;
   tcp?: string[];
   udp?: string[];
   stop?: boolean;
   template?: boolean;
+  detect?: boolean;
 }
 
 export async function runPorts(opts: RunPortsOpts): Promise<void> {
   const { ws } = opts;
+
+  if (opts.detect) {
+    await printListeningPorts(ws);
+    return;
+  }
+
   const tcpFlag = opts.tcp ?? [];
   const udpFlag = opts.udp ?? [];
   const wantStop = Boolean(opts.stop);
@@ -157,6 +194,18 @@ export async function runPorts(opts: RunPortsOpts): Promise<void> {
   const templatePorts = await getTemplatePortsForWorkspace(ws.name);
   const pendingTemplate = templatePorts?.filter((p) => !activePorts.has(p)) ?? [];
 
+  // Best-effort: discover ports the agent currently sees listening (Coder API).
+  let discovered: ListeningPort[] = [];
+  const agentId = agentIdForWorkspace(ws);
+  if (agentId) {
+    discovered = await listeningPorts(agentId).catch(() => []);
+  }
+  const pendingDiscovered = discovered.filter(
+    (d) =>
+      !activePorts.has(`${d.port}:${d.port}`) &&
+      !PORT_PRESETS.some((preset) => preset.remote === d.port),
+  );
+
   const CUSTOM_VALUE = "__custom__";
   const STOP_VALUE = "__stop__";
   const TEMPLATE_VALUE = "__template__";
@@ -180,6 +229,13 @@ export async function runPorts(opts: RunPortsOpts): Promise<void> {
     options.push({
       value: TEMPLATE_VALUE,
       label: `${pc.cyan("Start template ports")} ${pc.dim(pendingTemplate.join(", "))}`,
+    });
+  }
+  for (const d of pendingDiscovered) {
+    const proc = d.processName ? `  ${pc.dim(d.processName)}` : "";
+    options.push({
+      value: `${d.port}:${d.port}`,
+      label: `${pc.green("◉")} ${pc.bold(String(d.port))} ${pc.dim("(listening)")}${proc}`,
     });
   }
   options.push({
@@ -278,6 +334,11 @@ export const portForwardCommand = defineCommand({
       type: "boolean",
       description: "Start port forwards defined in the workspace's layout template",
     },
+    detect: {
+      type: "boolean",
+      alias: "d",
+      description: "Discover ports the workspace is listening on (via the Coder API)",
+    },
     all: {
       type: "boolean",
       alias: "a",
@@ -309,6 +370,7 @@ export const portForwardCommand = defineCommand({
       udp: parseMappings(args.udp as string | undefined),
       stop: Boolean(args.stop),
       template: Boolean(args.template),
+      detect: Boolean(args.detect),
     });
   },
 });
