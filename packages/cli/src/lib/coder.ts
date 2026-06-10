@@ -2,7 +2,7 @@ import { $ } from "bun";
 import { consola } from "consola";
 import { sshHost, sshHostWithSession, buildInteractiveSshCommand } from "./ssh.ts";
 import { refreshCacheAsync } from "./workspace-cache.ts";
-import type { TaskInfo } from "@cx/api-types";
+import type { TaskInfo, AppStatus } from "@cx/api-types";
 
 export interface CoderWorkspace {
   id: string;
@@ -41,6 +41,22 @@ export interface CoderWorkspace {
     healthy: boolean;
     failing_agents: string[];
   };
+  latest_app_status?: {
+    state?: string;
+    message?: string;
+    uri?: string;
+  } | null;
+}
+
+/** Project a workspace's latest agent app status onto the wire-friendly shape. */
+export function coderAppStatus(ws: CoderWorkspace): AppStatus | undefined {
+  const status = ws.latest_app_status;
+  if (!status) return undefined;
+  const state = status.state?.trim() || undefined;
+  const message = status.message?.trim() || undefined;
+  const uri = status.uri?.trim() || undefined;
+  if (!state && !message && !uri) return undefined;
+  return { state, message, uri };
 }
 
 /** Check that the user is logged in to Coder. Exits with a friendly error if not. */
@@ -76,6 +92,7 @@ export async function listWorkspaces(): Promise<CoderWorkspace[]> {
 
 export interface CoderTask {
   id: string;
+  owner_name: string;
   display_name: string;
   workspace_id: string;
   workspace_name: string;
@@ -308,6 +325,25 @@ export async function createWorkspace(
   const code = await proc.exited;
   if (code !== 0) throw new CoderCommandError("create", code, []);
   refreshCacheAsync();
+}
+
+/**
+ * Create a Coder Task (an agent session in its own ephemeral workspace). Unlike
+ * `createWorkspace`, `--preset` makes this non-interactive, so we capture stdout
+ * (`-q` prints just the task id) and parse the first non-empty line.
+ */
+export async function createTask(
+  prompt: string,
+  opts: { template: string; preset?: string },
+): Promise<string> {
+  const args = ["task", "create", "-q", "--template", opts.template];
+  if (opts.preset) args.push("--preset", opts.preset);
+  args.push(prompt); // Bun.$ auto-quotes the interpolated array
+  const result = await $`coder ${args}`.quiet();
+  const id = (await result.text()).trim().split(/\r?\n/).find(Boolean)?.trim();
+  if (!id) throw new Error("Could not parse task id from `coder task create`");
+  refreshCacheAsync();
+  return id;
 }
 
 /** Stop a running Coder workspace. */

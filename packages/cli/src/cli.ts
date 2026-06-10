@@ -23,6 +23,7 @@ import { restartCommand } from "./commands/restart.ts";
 import { serveCommand } from "./commands/serve.ts";
 import { pruneCommand } from "./commands/prune.ts";
 import { authCommand } from "./commands/auth.ts";
+import { taskCommand } from "./commands/task.ts";
 
 const commandGroups = [
   {
@@ -36,6 +37,10 @@ const commandGroups = [
   {
     label: "Workspace",
     commands: ["list", "ssh", "ports", "exec", "open", "logs"],
+  },
+  {
+    label: "Tasks",
+    commands: ["task"],
   },
   {
     label: "Configuration",
@@ -68,6 +73,7 @@ const main = defineCommand({
     exec: execCommand,
     open: openCommand,
     logs: logsCommand,
+    task: taskCommand,
     update: updateCommand,
     restart: restartCommand,
     delete: deleteCommand,

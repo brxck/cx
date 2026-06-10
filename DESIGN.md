@@ -20,6 +20,7 @@ cx
 ├── find <query>             # search layouts by name/branch/template
 ├── status                   # dashboard of all layouts + workspaces
 ├── restore [layout]         # re-establish a layout after restart
+├── task [prompt]            # create a Coder Task from a template's system prompt
 └── coder                    # Coder workspace utilities
     ├── list                 # list workspaces (enhanced)
     ├── ssh [workspace]      # SSH with session management
@@ -79,6 +80,25 @@ Dashboard view showing all layouts with their workspace state (running/stopped/s
 #### `restore [layout]`
 
 Re-establish a single layout after a restart. Resolves the target by exact name, fuzzy match, or interactive picker (scoped to layouts that aren't already active in Cmux), starts the Coder workspace if stopped, and re-invokes the Cmux custom command. Passing the name of an already-active layout errors with a hint to use `cx activate` instead.
+
+### Coder Tasks
+
+#### `task [prompt]`
+
+Create a **Coder Task** — an agent session that runs in its own ephemeral Coder workspace and (per the system prompt) opens a draft PR. cx reduces this to a single `coder task create -q --template <coderTemplate> --preset <preset> '<systemPrompt>\n\n---\n\n<userPrompt>'`, where the coder template, preset, and system prompt come from a chosen cx template.
+
+- The prompt is read from the positional argument (quote multi-word prompts), one or more files via `--file`/`-f` (comma-separate multiple), piped stdin, or `$EDITOR`/`$VISUAL` (fallback `vim`) via `--editor` (lines starting with `#` are stripped). Files and stdin act as context and a positional is the instruction; when both are present the context is wrapped as `<context>…</context>` ahead of the instruction, and when only context is supplied it becomes the prompt verbatim.
+- The cx template is resolved like `up` (project-local → global → interactive picker; `--template` to name it). The template's `systemPrompt` field (JSON `config.systemPrompt` or JS `meta.systemPrompt`, read **statically**) is prepended; `--system-prompt` overrides it; absent either, a built-in `DEFAULT_TASK_SYSTEM_PROMPT` is used.
+- The raw user prompt is saved to `~/.cx/prompts/<id>.md`. The task id, dashboard URL, and `coder task logs <id>` hint are printed.
+
+A task is just a Coder workspace, so the regular commands cover the rest: `cx list` to browse tasks/workspaces, `cx ssh <workspace>` or `cx attach <workspace>` to jump in, `coder task logs <id>` for the agent transcript.
+
+Templates can define the system prompt per-template:
+
+```json
+{ "name": "fix", "coder": { "template": "owner-dev", "preset": "Dev: Standard" }, "type": "ephemeral",
+  "systemPrompt": "You are fixing a bug. Open a draft PR when done.", "layout": { ... } }
+```
 
 ### Coder Utilities (`coder <cmd>`)
 

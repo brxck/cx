@@ -70,12 +70,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return menu
         }
 
-        let running = status.runningWorkspaces
-        if running.isEmpty {
+        let tasks = status.taskWorkspaces
+        let plain = status.plainWorkspaces
+
+        if tasks.isEmpty && plain.isEmpty {
             menu.addItem(disabledItem("No running workspaces"))
         } else {
-            for workspace in running {
-                menu.addItem(workspaceMenuItem(workspace, status: status))
+            if !plain.isEmpty {
+                menu.addItem(sectionItem("Workspaces"))
+                for workspace in plain {
+                    menu.addItem(workspaceMenuItem(workspace, status: status))
+                }
+            }
+            if !tasks.isEmpty {
+                if !plain.isEmpty {
+                    menu.addItem(.separator())
+                }
+                menu.addItem(sectionItem("Tasks"))
+                for workspace in tasks {
+                    menu.addItem(taskMenuItem(workspace, status: status))
+                }
             }
         }
 
@@ -103,38 +117,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return menu
     }
 
-    private func workspaceMenuItem(_ workspace: WorkspaceInfo, status: StatusResponse) -> NSMenuItem {
-        let layout = status.activeLayout(for: workspace.name)
-        let suffix = layout.map { " · \($0.name)" } ?? ""
-        let title = workspace.task?.displayName ?? workspace.name
-        let item = NSMenuItem(title: "\(title)\(suffix)", action: nil, keyEquivalent: "")
+    private func taskMenuItem(_ workspace: WorkspaceInfo, status: StatusResponse) -> NSMenuItem {
+        let task = workspace.task
+        let title = truncated(task?.displayName ?? workspace.name, max: 60)
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.image = circleImage(for: workspace.indicator)
 
         let submenu = NSMenu()
-        if let layout {
+        appendHeaderGroup(
+            to: submenu,
+            workspace: workspace,
+            status: status,
+            state: task?.state,
+            message: task?.message,
+            link: task?.resourceLink,
+            coderUrl: task?.url
+        )
+        appendAppsSection(to: submenu, workspace: workspace)
+        submenu.addItem(.separator())
+        appendWorkspaceSection(to: submenu, workspace: workspace)
+
+        item.submenu = submenu
+        return item
+    }
+
+    private func workspaceMenuItem(_ workspace: WorkspaceInfo, status: StatusResponse) -> NSMenuItem {
+        let layout = status.activeLayout(for: workspace.name)
+        let suffix = layout.map { " · \($0.name)" } ?? ""
+        let item = NSMenuItem(title: "\(workspace.name)\(suffix)", action: nil, keyEquivalent: "")
+        item.image = circleImage(for: workspace.indicator)
+
+        let submenu = NSMenu()
+        appendHeaderGroup(
+            to: submenu,
+            workspace: workspace,
+            status: status,
+            state: workspace.appStatus?.state,
+            message: workspace.appStatus?.message,
+            link: workspace.appStatus?.resourceLink
+        )
+        appendAppsSection(to: submenu, workspace: workspace)
+        submenu.addItem(.separator())
+        appendWorkspaceSection(to: submenu, workspace: workspace)
+
+        item.submenu = submenu
+        return item
+    }
+
+    /// Renders the message detail, then View in cmux, then the resource/task
+    /// links as a single group, followed by a separator when non-empty.
+    private func appendHeaderGroup(
+        to submenu: NSMenu,
+        workspace: WorkspaceInfo,
+        status: StatusResponse,
+        state: String?,
+        message: String?,
+        link: String?,
+        coderUrl: String? = nil
+    ) {
+        var added = false
+
+        var detailParts: [String] = []
+        if let state, !state.isEmpty { detailParts.append(state) }
+        if let message, !message.isEmpty { detailParts.append(message) }
+        let detail = detailParts.joined(separator: " · ")
+        if !detail.isEmpty {
+            submenu.addItem(wrappingDetailItem(detail))
+            added = true
+        }
+
+        if let layout = status.activeLayout(for: workspace.name) {
             submenu.addItem(actionItem("View in cmux", symbol: "arrow.right") { [weak self] in
                 self?.perform("Activating \(layout.name)") {
                     await self?.model.activateLayout(layout.name) ?? ActionResponse(ok: false, error: "Menu bar app closed")
                 }
             })
-            submenu.addItem(.separator())
+            added = true
         }
 
-        if let task = workspace.task {
-            submenu.addItem(sectionItem("Task"))
-            var detailParts: [String] = []
-            if let state = task.state, !state.isEmpty { detailParts.append(state) }
-            if let message = task.message, !message.isEmpty {
-                detailParts.append(message.count > 80 ? String(message.prefix(79)) + "…" : message)
-            }
-            let detail = detailParts.joined(separator: " · ")
-            submenu.addItem(disabledItem(detail.isEmpty ? task.displayName : detail))
-            if let prUrl = task.prUrl, !prUrl.isEmpty {
-                submenu.addItem(urlItem("Open PR", symbol: "arrow.up.right.square", url: prUrl))
-            }
-            submenu.addItem(.separator())
+        if let link, !link.isEmpty {
+            submenu.addItem(urlItem(linkLabel(for: link), symbol: "arrow.up.right.square", url: link))
+            added = true
         }
 
+        if let coderUrl, !coderUrl.isEmpty {
+            submenu.addItem(urlItem("Open in Coder", symbol: "list.bullet.rectangle", url: coderUrl))
+            added = true
+        }
+
+        if added { submenu.addItem(.separator()) }
+    }
+
+    private func appendAppsSection(to submenu: NSMenu, workspace: WorkspaceInfo) {
         submenu.addItem(sectionItem("Apps"))
         var addedApp = false
         if let dashboard = workspace.dashboard {
@@ -154,8 +228,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !addedApp {
             submenu.addItem(disabledItem("No apps"))
         }
+    }
 
-        submenu.addItem(.separator())
+    private func appendWorkspaceSection(to submenu: NSMenu, workspace: WorkspaceInfo) {
         submenu.addItem(sectionItem("Workspace"))
         if workspace.isRunning {
             submenu.addItem(actionItem("Stop", symbol: "stop.fill") { [weak self] in
@@ -180,9 +255,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await self?.model.updateWorkspace(workspace.name) ?? ActionResponse(ok: false, error: "Menu bar app closed")
             }
         })
-
-        item.submenu = submenu
-        return item
     }
 
     private func refresh() {
@@ -251,6 +323,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
+    /// A disabled, word-wrapping detail row. Menu items don't wrap their title,
+    /// so this hosts a multi-line NSTextField as a custom view.
+    private func wrappingDetailItem(_ text: String) -> NSMenuItem {
+        let leftInset: CGFloat = 21
+        let rightInset: CGFloat = 12
+        let vInset: CGFloat = 4
+        let wrapWidth: CGFloat = 320
+
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = NSFont.menuFont(ofSize: 0)
+        label.textColor = .secondaryLabelColor
+        label.isEditable = false
+        label.isSelectable = false
+        label.drawsBackground = false
+        label.maximumNumberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.preferredMaxLayoutWidth = wrapWidth
+
+        let fitting = label.sizeThatFits(NSSize(width: wrapWidth, height: .greatestFiniteMagnitude))
+        let height = ceil(fitting.height)
+        label.frame = NSRect(x: leftInset, y: vInset, width: wrapWidth, height: height)
+
+        let container = NSView(frame: NSRect(
+            x: 0,
+            y: 0,
+            width: leftInset + wrapWidth + rightInset,
+            height: height + vInset * 2
+        ))
+        container.addSubview(label)
+
+        let item = NSMenuItem()
+        item.isEnabled = false
+        item.view = container
+        return item
+    }
+
     private func sectionItem(_ title: String) -> NSMenuItem {
         let item = disabledItem(title)
         item.attributedTitle = NSAttributedString(
@@ -269,6 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func symbolImage(_ name: String) -> NSImage? {
         NSImage(systemSymbolName: name, accessibilityDescription: nil)
+    }
+
+    private func truncated(_ text: String, max: Int) -> String {
+        guard text.count > max else { return text }
+        return String(text.prefix(max - 1)) + "…"
     }
 
     private func circleImage(for indicator: StatusIndicator) -> NSImage {

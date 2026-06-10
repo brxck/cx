@@ -3,6 +3,7 @@ import {
   listTasks,
   taskByWorkspaceId,
   coderTaskToInfo,
+  coderAppStatus,
   workspaceStatus,
   relativeTime,
   getCoderUrl,
@@ -100,6 +101,7 @@ export async function handleStatus(): Promise<Response> {
       terminal,
       apps,
       task: task ? coderTaskToInfo(task, taskUrlCtx) : undefined,
+      appStatus: coderAppStatus(ws),
     };
   });
 

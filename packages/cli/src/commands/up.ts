@@ -15,15 +15,10 @@ import {
 } from "../lib/coder.ts";
 import { printCoderFailure } from "../lib/coder-ui.ts";
 import {
-  resolveTemplateSource,
-  listTemplateSources,
-  getProjectTemplateSources,
   prepareTemplate,
-  templateDisplay,
-  ensureDefaultsSeeded,
-  type TemplateSource,
   type TemplateConfig,
 } from "../lib/templates.ts";
+import { resolveSourceOrDefault } from "../lib/template-picker.ts";
 import { parseVarsArg } from "../lib/variables.ts";
 import { saveLayout, recordSession } from "../lib/store.ts";
 import { buildCmuxLayout, startHeadlessSessions, startPortForwarding } from "../lib/layout-builder.ts";
@@ -220,69 +215,4 @@ async function fetchWorkspaceContext(name: string): Promise<WorkspaceContext> {
   const ws = workspaces.find((w) => w.name === name);
   if (!ws) throw new Error(`Coder workspace "${name}" not found after ensure`);
   return buildWorkspaceContext(ws, base);
-}
-
-// ── Template resolution ──
-
-async function resolveSourceOrDefault(
-  name: string | undefined,
-): Promise<{ source: TemplateSource; projectPath: string | null }> {
-  await ensureDefaultsSeeded();
-
-  if (name) {
-    const resolved = await resolveTemplateSource({ name });
-    if (!resolved) {
-      p.log.error(`Template ${pc.bold(name)} not found`);
-      process.exit(1);
-    }
-    return { source: resolved.source, projectPath: resolved.projectPath };
-  }
-
-  const project = await getProjectTemplateSources();
-  const projectSources = project?.sources ?? [];
-  const globalSources = await listTemplateSources();
-
-  type PickerEntry = {
-    source: TemplateSource;
-    origin: "project" | "global";
-  };
-
-  const entries: PickerEntry[] = [
-    ...projectSources.map((s) => ({ source: s, origin: "project" as const })),
-    ...globalSources.map((s) => ({ source: s, origin: "global" as const })),
-  ];
-
-  entries.sort((a, b) => a.source.name.localeCompare(b.source.name));
-
-  const choice = await p.autocomplete({
-    message: "Select a template",
-    options: entries.map((e) => ({
-      value: e,
-      label: renderPickerLabel(e),
-    })),
-    placeholder: "Type to filter",
-  });
-
-  if (p.isCancel(choice)) {
-    p.cancel("Cancelled.");
-    process.exit(0);
-  }
-  const picked = choice as PickerEntry;
-
-  return {
-    source: picked.source,
-    projectPath: picked.origin === "project" ? (project?.projectPath ?? null) : null,
-  };
-}
-
-function renderPickerLabel(entry: {
-  source: TemplateSource;
-  origin: "project" | "global";
-}): string {
-  const d = templateDisplay(entry.source);
-  const projectTag = entry.origin === "project" ? `  ${pc.dim("(project)")}` : "";
-  if (d.dynamic) {
-    return `${pc.bold(d.name)}  ${pc.dim("(dynamic)")}${projectTag}`;
-  }
-  return `${pc.bold(d.name)}  ${pc.dim(d.coderTemplate ?? "")}  ${pc.dim(d.type ?? "")}${projectTag}`;
 }

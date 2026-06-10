@@ -46,6 +46,39 @@ public enum WorkspaceIndicator: String, Equatable, Sendable {
     case inactive
 }
 
+/// A human label for a resource URL. Coder agent status carries only a bare URI
+/// (no title), so the label is derived from the URL itself.
+public func linkLabel(for link: String?) -> String {
+    guard let link, let url = URL(string: link) else {
+        return "Open Link"
+    }
+
+    let segments = url.path.split(separator: "/").map(String.init)
+    let prKeywords: Set<String> = ["pull", "pulls", "pull-requests", "merge_requests"]
+    if let index = segments.firstIndex(where: { prKeywords.contains($0.lowercased()) }) {
+        let next = index + 1 < segments.count ? segments[index + 1] : nil
+        if let next, next.allSatisfy(\.isNumber) {
+            return "Open PR #\(next)"
+        }
+        return "Open PR"
+    }
+
+    if var host = url.host {
+        if host.hasPrefix("www.") { host.removeFirst(4) }
+        if !host.isEmpty { return "Open \(host)" }
+    }
+
+    return "Open Link"
+}
+
+public extension TaskInfo {
+    var resourceLinkLabel: String { linkLabel(for: resourceLink) }
+}
+
+public extension AppStatus {
+    var resourceLinkLabel: String { linkLabel(for: resourceLink) }
+}
+
 public extension WorkspaceInfo {
     var isRunning: Bool {
         status == "running"
@@ -98,6 +131,16 @@ public extension StatusResponse {
 
     var runningWorkspaces: [WorkspaceInfo] {
         sortedWorkspaces.filter(\.isRunning)
+    }
+
+    /// Running workspaces that back a Coder task, surfaced under the Tasks group.
+    var taskWorkspaces: [WorkspaceInfo] {
+        runningWorkspaces.filter { $0.task != nil }
+    }
+
+    /// Running workspaces with no associated task, surfaced under the Workspaces group.
+    var plainWorkspaces: [WorkspaceInfo] {
+        runningWorkspaces.filter { $0.task == nil }
     }
 
     var unhealthyRunningCount: Int {

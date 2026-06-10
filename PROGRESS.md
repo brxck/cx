@@ -21,6 +21,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | `find <query>` | Done | Fuzzy search across name/coder_ws/template/branch/path, `--branch` with live sidebar state, `--path` flag. Activates on selection. |
 | `restore [layout]` | Done | Restores a single layout after restart via exact/fuzzy/picker resolution (picker scoped to non-active layouts): checks Coder workspace status (starts if stopped, skips if deleted), probes live ZMX sessions via SSH, reuses alive sessions / restarts dead ones, rebuilds Cmux layout, updates store, starts port forwarding, regenerates cmux.json. Errors with `cx activate` hint if the target is already active. `--dry-run`/`-n` previews. |
 | `init` | Done | Interactive config setup. Auto-detects username from `coder whoami`, prompts for confirmation and agent name. Saves to `~/.config/cx/config.json`. Configures SSH: runs `coder config-ssh`, inserts ZMX Match block into `~/.ssh/config` for session-based SSH (idempotent). |
+| `task [prompt]` | Done | Creates a Coder Task from a cx template's coder template + preset + system prompt. Prompt via positional (quote it), `--file`/`-f` (comma-separate multiple), piped stdin, or `$EDITOR` (`--editor`, strips `#` lines). Files/stdin act as context; a positional is the instruction (wrapped as `<context>…</context>` when both are present). System prompt from the template's `systemPrompt` field, overridable with `--system-prompt`, falling back to `DEFAULT_TASK_SYSTEM_PROMPT`. Saves the raw user prompt to `~/.cx/prompts/<id>.md`, prints task id + dashboard URL + logs hint. Listing/attaching reuse the normal workspace commands (`cx list`, `cx ssh`, `cx attach`). |
 
 ## Features
 
@@ -51,7 +52,8 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | Module | Purpose |
 |---|---|
 | `src/lib/cmux.ts` | Cmux CLI wrapper: workspace/pane/surface CRUD, input, notifications, sidebar state with `SidebarState`/`parseSidebarState`, list-workspaces parsing |
-| `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping |
+| `src/lib/templates.ts` | Template types, load/save, per-project discovery, cmux.json generation with SSH wrapping, `systemPrompt` field + `templateSystemPrompt()` + `DEFAULT_TASK_SYSTEM_PROMPT` for `cx task` |
+| `src/lib/template-picker.ts` | Shared template resolver/picker (`resolveSourceOrDefault`, `renderPickerLabel`) used by `up` and `task` |
 | `src/lib/store.ts` | SQLite state store — layouts (with path) and sessions, v2 schema |
 | `src/lib/layout-builder.ts` | Shared layout building: `buildCmuxLayout()` (tree walker + Cmux workspace creation, returns sessions), `startHeadlessSessions()`, `collectTerminalSurfaces()`, `validateSessionNames()`, `startPortForwarding()` |
 | `src/lib/ports.ts` | Port-forward process detection (`detectPortForwards`, `detectPortForwardMap`) and killing (`stopPortForwards`) |

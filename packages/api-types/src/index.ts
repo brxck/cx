@@ -19,6 +19,17 @@ export interface TaskInfo {
   url?: string;
 }
 
+/**
+ * Latest agent app status reported by a workspace, mirroring Coder's
+ * `latest_app_status`. Present whether or not the workspace backs a task.
+ */
+export interface AppStatus {
+  state?: string;
+  message?: string;
+  /** External resource the agent produced (typically a PR URL). */
+  uri?: string;
+}
+
 export interface WorkspaceInfo {
   name: string;
   status: string;
@@ -32,6 +43,7 @@ export interface WorkspaceInfo {
   terminal?: string;
   apps?: WorkspaceApp[];
   task?: TaskInfo;
+  appStatus?: AppStatus;
 }
 
 export interface LayoutInfo {

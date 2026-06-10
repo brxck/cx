@@ -20,7 +20,11 @@ public struct TaskInfo: Codable, Equatable, Sendable {
     public var status: String
     public var state: String?
     public var message: String?
+    /// Coder task state URI; points at the PR or other external resource the task produced.
+    public var uri: String?
     public var prUrl: String?
+    /// Coder Task UI URL.
+    public var url: String?
 
     public init(
         id: String,
@@ -28,14 +32,42 @@ public struct TaskInfo: Codable, Equatable, Sendable {
         status: String,
         state: String? = nil,
         message: String? = nil,
-        prUrl: String? = nil
+        uri: String? = nil,
+        prUrl: String? = nil,
+        url: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.status = status
         self.state = state
         self.message = message
+        self.uri = uri
         self.prUrl = prUrl
+        self.url = url
+    }
+
+    /// The external resource the task points at, preferring the canonical `uri`.
+    public var resourceLink: String? {
+        if let uri, !uri.isEmpty { return uri }
+        if let prUrl, !prUrl.isEmpty { return prUrl }
+        return nil
+    }
+}
+
+public struct AppStatus: Codable, Equatable, Sendable {
+    public var state: String?
+    public var message: String?
+    public var uri: String?
+
+    public init(state: String? = nil, message: String? = nil, uri: String? = nil) {
+        self.state = state
+        self.message = message
+        self.uri = uri
+    }
+
+    public var resourceLink: String? {
+        guard let uri, !uri.isEmpty else { return nil }
+        return uri
     }
 }
 
@@ -54,6 +86,7 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
     public var terminal: String?
     public var apps: [WorkspaceApp]?
     public var task: TaskInfo?
+    public var appStatus: AppStatus?
 
     public init(
         name: String,
@@ -67,7 +100,8 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
         dashboard: String? = nil,
         terminal: String? = nil,
         apps: [WorkspaceApp]? = nil,
-        task: TaskInfo? = nil
+        task: TaskInfo? = nil,
+        appStatus: AppStatus? = nil
     ) {
         self.name = name
         self.status = status
@@ -81,6 +115,7 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
         self.terminal = terminal
         self.apps = apps
         self.task = task
+        self.appStatus = appStatus
     }
 }
 

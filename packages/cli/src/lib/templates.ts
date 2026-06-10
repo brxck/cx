@@ -25,6 +25,8 @@ export interface TemplateConfig {
   color?: string;
   ports?: string[];
   variables?: Record<string, TemplateVariable>;
+  /** System prompt prepended to a user prompt when creating a Coder Task with `cx task`. */
+  systemPrompt?: string;
   layout: LayoutNode;
 }
 
@@ -60,6 +62,8 @@ export interface TemplateMeta {
   type?: "ephemeral" | "persistent";
   color?: string;
   description?: string;
+  /** System prompt prepended to a user prompt when creating a Coder Task with `cx task`. Read statically. */
+  systemPrompt?: string;
 }
 
 /** Layout can be a static tree (legacy) or an async fn receiving live workspace context. */
@@ -179,6 +183,40 @@ export function templateDisplay(source: TemplateSource): TemplateDisplay {
     dynamic: !source.meta,
   };
 }
+
+/**
+ * Read a template's task system prompt statically — JSON from `config.systemPrompt`,
+ * JS from the static `meta.systemPrompt` export (the layout fn is never executed,
+ * since `cx task` has no workspace name to pass it).
+ */
+export function templateSystemPrompt(source: TemplateSource): string | undefined {
+  if (source.kind === "json") return source.config.systemPrompt;
+  return source.meta?.systemPrompt;
+}
+
+/**
+ * Fallback system prompt for `cx task` when a template defines none. Ported from
+ * Owner's tasks-beta default: instructs the agent to track work, open a draft PR
+ * from a `cx-task--<id>` branch, link the Coder Task, and label it.
+ */
+export const DEFAULT_TASK_SYSTEM_PROMPT = `Your first reply MUST begin with creating a task list using the TaskCreate tool.
+
+- Never start working on code changes before creating a task list that outlines all the steps needed to complete the task.
+- Always break complex tasks into smaller, manageable steps in your task list.
+- As you work through a task, update its status with TaskUpdate from "pending" to "in_progress" to "completed".
+- End each task list with FULLY re-Reading and re-evaluating the contents of CLAUDE.md to ensure all rules have been followed.
+- If during development you discover additional work is needed, update your task list to include these new items, with a re-evaluation of CLAUDE.md afterwards.
+
+Assume that the deliverable is a pull request, unless it's obvious they are planning or merely starting an investigation.
+
+After completing the task (including linting, tests, formatting):
+
+1. Create a new branch from main (e.g. 'cx-task--<task-id>') (you can get the task id from CODER_TASK_ID in the environment variables)
+2. Commit your changes
+3. Create a DRAFT pull request
+4. Include a link to this Coder Task in the PR description (you can get the task URL from CODER_TASK_URL in the environment variables)
+5. Add the label \`coder-task-generated\` to the PR
+`;
 
 // ── Template management ──
 
