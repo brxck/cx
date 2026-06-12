@@ -12,6 +12,7 @@ import { handleStart } from "../api/start.ts";
 import { handleUpdate } from "../api/update.ts";
 import { handleRestart } from "../api/restart.ts";
 import { handleActivate } from "../api/activate.ts";
+import { handleFavorite } from "../api/favorite.ts";
 import { WEB_ASSETS } from "../web/embedded.ts";
 import { loadOrCreateApiKey, timingSafeEqualString, KEY_PATH } from "../lib/api-key.ts";
 
@@ -139,6 +140,13 @@ export const serveCommand = defineCommand({
                   break;
                 }
                 response = await handleActivate(req);
+                break;
+              case "/api/favorite":
+                if (req.method !== "POST") {
+                  response = Response.json({ error: "Method not allowed" }, { status: 405 });
+                  break;
+                }
+                response = await handleFavorite(req);
                 break;
               default:
                 response = Response.json({ error: "Not found" }, { status: 404 });

@@ -45,6 +45,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | Centralized SSH host builder | Done | `src/lib/ssh.ts` — `sshHost()` builds `{agent}.{workspace}.{username}.coder`, `sshHostWithSession()` appends `.{session}`. All callsites migrated from old `coder.{workspace}` format. |
 | Manual port forward control | Done | Unified `cx ports` command handles start/stop/template/ad-hoc in a single interactive + flag-driven UI, replacing separate `forward`/`unforward` commands |
 | Git branch awareness | Done | Live sidebar data persisted to DB opportunistically by `status`, `activate`, and `find --branch`. Enables offline branch search. |
+| Pin / favorite workspaces | Done | Reuses Coder's native `favorite` flag (`coder favorite`/`unfavorite`). Pinned workspaces sort to the top of every list and stay visible even when stale-stopped/not-running. Toggle via `POST /api/favorite`, the `cx list` "Pin / unpin" action, web/Raycast/menu-bar pin actions. Surfaced with a ★ marker in `cx list`, `cx status`, web, Raycast, and both menu bars. |
 | Health monitoring | Not started | |
 
 ## Libraries

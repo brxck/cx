@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let status = model.status else {
             menu.addItem(disabledItem("Loading..."))
             menu.addItem(.separator())
+            menu.addItem(openDashboardItem())
             menu.addItem(actionItem("Refresh", symbol: "arrow.clockwise") { [weak self] in
                 self?.refresh()
             })
@@ -94,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(.separator())
+        menu.addItem(openDashboardItem())
         menu.addItem(actionItem("Refresh", symbol: "arrow.clockwise", keyEquivalent: "r") { [weak self] in
             self?.refresh()
         })
@@ -111,15 +113,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.refresh()
         })
         menu.addItem(.separator())
+        menu.addItem(openDashboardItem())
         menu.addItem(actionItem("Quit", symbol: "power") {
             NSApp.terminate(nil)
         })
         return menu
     }
 
+    private func openDashboardItem() -> NSMenuItem {
+        urlItem("Open Dashboard", symbol: "globe", url: model.webURL.absoluteString)
+    }
+
     private func taskMenuItem(_ workspace: WorkspaceInfo, status: StatusResponse) -> NSMenuItem {
         let task = workspace.task
-        let title = truncated(task?.displayName ?? workspace.name, max: 60)
+        let baseTitle = truncated(task?.displayName ?? workspace.name, max: 60)
+        let title = workspace.isFavorite ? "★ \(baseTitle)" : baseTitle
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.image = circleImage(for: workspace.indicator)
 
@@ -144,7 +152,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func workspaceMenuItem(_ workspace: WorkspaceInfo, status: StatusResponse) -> NSMenuItem {
         let layout = status.activeLayout(for: workspace.name)
         let suffix = layout.map { " · \($0.name)" } ?? ""
-        let item = NSMenuItem(title: "\(workspace.name)\(suffix)", action: nil, keyEquivalent: "")
+        let prefix = workspace.isFavorite ? "★ " : ""
+        let item = NSMenuItem(title: "\(prefix)\(workspace.name)\(suffix)", action: nil, keyEquivalent: "")
         item.image = circleImage(for: workspace.indicator)
 
         let submenu = NSMenu()
@@ -253,6 +262,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         submenu.addItem(actionItem("Update", symbol: "arrow.up") { [weak self] in
             self?.perform("Updating \(workspace.name)") {
                 await self?.model.updateWorkspace(workspace.name) ?? ActionResponse(ok: false, error: "Menu bar app closed")
+            }
+        })
+        let pinned = workspace.isFavorite
+        submenu.addItem(actionItem(pinned ? "Unpin" : "Pin to Top", symbol: pinned ? "star.slash" : "star") { [weak self] in
+            self?.perform(pinned ? "Unpinning \(workspace.name)" : "Pinning \(workspace.name)") {
+                await self?.model.setFavorite(workspace.name, favorite: !pinned) ?? ActionResponse(ok: false, error: "Menu bar app closed")
             }
         })
     }

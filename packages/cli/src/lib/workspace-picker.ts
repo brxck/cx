@@ -39,8 +39,9 @@ function healthBadge(ws: CoderWorkspace): string {
 }
 
 export function formatWorkspaceLabel(ws: CoderWorkspace): string {
+  const star = ws.favorite ? pc.yellow("★ ") : "";
   const parts = [
-    `${pc.bold(ws.name)} ${pc.dim(`(${ws.template_name})`)}`,
+    `${star}${pc.bold(ws.name)} ${pc.dim(`(${ws.template_name})`)}`,
     statusBadge(ws),
     ...(workspaceStatus(ws) === "running" && !ws.health?.healthy ? [healthBadge(ws)] : []),
     pc.dim(`built ${relativeTime(ws.latest_build.created_at)} ago`),
@@ -60,6 +61,9 @@ export function fuzzyMatch(query: string, target: string): boolean {
 
 function sortWorkspaces(list: CoderWorkspace[]): CoderWorkspace[] {
   return [...list].sort((a, b) => {
+    const aFav = a.favorite ? 0 : 1;
+    const bFav = b.favorite ? 0 : 1;
+    if (aFav !== bFav) return aFav - bFav;
     const aRunning = workspaceStatus(a) === "running" ? 0 : 1;
     const bRunning = workspaceStatus(b) === "running" ? 0 : 1;
     if (aRunning !== bRunning) return aRunning - bRunning;
@@ -120,6 +124,7 @@ function buildPickerOptions(
 
   if (!showStopped) {
     const active = list.filter((ws) => {
+      if (ws.favorite) return true;
       const s = workspaceStatus(ws);
       if (s === "failed") return false;
       if (s === "stopped") return !isStaleStoppedWorkspace(ws);

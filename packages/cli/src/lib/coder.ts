@@ -13,12 +13,37 @@ export interface CoderWorkspace {
   owner_name: string;
   organization_name: string;
   template_name: string;
+  template_display_name?: string;
+  template_icon?: string;
   outdated: boolean;
+  favorite?: boolean;
+  last_used_at?: string;
+  dormant_at?: string | null;
+  deleting_at?: string | null;
+  autostart_schedule?: string | null;
+  next_start_at?: string | null;
+  ttl_ms?: number | null;
+  automatic_updates?: string;
   latest_build: {
     status: string;
     transition: string;
     created_at: string;
     template_version_name: string;
+    reason?: string;
+    daily_cost?: number;
+    deadline?: string | null;
+    max_deadline?: string | null;
+    job?: {
+      status?: string;
+      error?: string;
+      error_code?: string;
+      queue_position?: number;
+      queue_size?: number;
+    };
+    matched_provisioners?: {
+      count: number;
+      available: number;
+    } | null;
     resources: Array<{
       agents?: Array<{
         id: string;
@@ -26,6 +51,15 @@ export interface CoderWorkspace {
         status: string;
         lifecycle_state: string;
         display_apps?: string[];
+        health?: { healthy: boolean; reason?: string };
+        architecture?: string;
+        operating_system?: string;
+        version?: string;
+        last_connected_at?: string | null;
+        disconnected_at?: string | null;
+        started_at?: string | null;
+        ready_at?: string | null;
+        latency?: Record<string, { latency_ms: number; preferred: boolean }>;
         apps?: Array<{
           slug: string;
           display_name: string;
@@ -36,7 +70,19 @@ export interface CoderWorkspace {
           subdomain_name?: string;
           external?: boolean;
           command?: string;
+          health?: string;
+          sharing_level?: string;
         }>;
+        scripts?: Array<{
+          display_name?: string;
+          status?: string;
+          exit_code?: number | null;
+        }>;
+      }>;
+      metadata?: Array<{
+        key: string;
+        value: string;
+        sensitive: boolean;
       }>;
     }>;
   };
@@ -48,6 +94,8 @@ export interface CoderWorkspace {
     state?: string;
     message?: string;
     uri?: string;
+    needs_user_attention?: boolean;
+    icon?: string;
   } | null;
 }
 
@@ -59,7 +107,12 @@ export function coderAppStatus(ws: CoderWorkspace): AppStatus | undefined {
   const message = status.message?.trim() || undefined;
   const uri = status.uri?.trim() || undefined;
   if (!state && !message && !uri) return undefined;
-  return { state, message, uri };
+  return {
+    state,
+    message,
+    uri,
+    needsUserAttention: status.needs_user_attention || undefined,
+  };
 }
 
 /** Check that the user is logged in to Coder. Exits with a friendly error if not. */
@@ -364,7 +417,8 @@ const STALE_STOPPED_MS = 24 * 60 * 60 * 1000;
 export function isStaleStoppedWorkspace(ws: CoderWorkspace): boolean {
   const s = workspaceStatus(ws);
   if (s !== "stopped") return false;
-  const age = Date.now() - new Date(ws.latest_build.created_at).getTime();
+  const ref = ws.last_used_at || ws.latest_build.created_at;
+  const age = Date.now() - new Date(ref).getTime();
   return age > STALE_STOPPED_MS;
 }
 
@@ -505,6 +559,18 @@ export async function stopWorkspace(name: string, opts?: LogStreamOpts): Promise
 export async function startWorkspace(name: string, opts?: LogStreamOpts): Promise<void> {
   const { code, tail } = await runCoderProcess(["coder", "start", name], opts);
   if (code !== 0) throw new CoderCommandError("start", code, tail);
+  refreshCacheAsync();
+}
+
+/** Add a workspace to the user's Coder favorites (pins it to the top of lists). */
+export async function favoriteWorkspace(name: string): Promise<void> {
+  await $`coder favorite ${name}`.quiet();
+  refreshCacheAsync();
+}
+
+/** Remove a workspace from the user's Coder favorites. */
+export async function unfavoriteWorkspace(name: string): Promise<void> {
+  await $`coder unfavorite ${name}`.quiet();
   refreshCacheAsync();
 }
 

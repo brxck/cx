@@ -60,8 +60,9 @@ function taskDetailLine(task: TaskInfo): string | null {
 
 function renderLayoutBox(layout: LayoutStatus): void {
   const width = 66;
-  const nameTag = layout.cmuxSelected ? pc.bold(pc.cyan(layout.name)) : pc.bold(layout.name);
-  const headerPad = width - layout.name.length - 4;
+  const star = layout.coderFavorite ? pc.yellow("★ ") : "";
+  const nameTag = star + (layout.cmuxSelected ? pc.bold(pc.cyan(layout.name)) : pc.bold(layout.name));
+  const headerPad = width - layout.name.length - (layout.coderFavorite ? 6 : 4);
   const top = pc.dim("┌─ ") + nameTag + " " + pc.dim("─".repeat(Math.max(0, headerPad)) + "┐");
   const bottom = pc.dim("└" + "─".repeat(width - 1) + "┘");
 
@@ -149,9 +150,12 @@ function renderUntracked(
   if (workspaces.length === 0) return;
   consola.log("");
   consola.log(pc.dim("Untracked Coder workspaces:"));
-  for (const ws of workspaces) {
+  const sorted = [...workspaces].sort(
+    (a, b) => (a.favorite ? 0 : 1) - (b.favorite ? 0 : 1),
+  );
+  for (const ws of sorted) {
     const status = workspaceStatus(ws);
-    const badge = statusBadge(status);
+    const badge = ws.favorite ? pc.yellow("★") : statusBadge(status);
     const age = relativeTime(ws.latest_build.created_at);
     const task = tasks.get(ws.id);
 
@@ -210,7 +214,11 @@ export const statusCommand = defineCommand({
       consola.warn("Cmux is not running — sidebar data unavailable");
     }
 
-    let layoutStatuses = result.layouts;
+    // Pinned (Coder favorite) layouts float to the top; otherwise preserve
+    // the store's active_at ordering.
+    let layoutStatuses = [...result.layouts].sort(
+      (a, b) => (a.coderFavorite ? 0 : 1) - (b.coderFavorite ? 0 : 1),
+    );
 
     // Filter to specific layout if requested
     if (args.layout) {

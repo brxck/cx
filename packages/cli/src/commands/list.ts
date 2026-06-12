@@ -140,8 +140,11 @@ export const listCommand = defineCommand({
     const sortAndFilter = (list: CoderWorkspace[]): CoderWorkspace[] =>
       list
         .filter(matchesFilter)
-        .filter((ws) => showAll || !isStaleStoppedWorkspace(ws))
+        .filter((ws) => showAll || ws.favorite || !isStaleStoppedWorkspace(ws))
         .sort((a, b) => {
+          const aFav = a.favorite ? 0 : 1;
+          const bFav = b.favorite ? 0 : 1;
+          if (aFav !== bFav) return aFav - bFav;
           const aRunning = workspaceStatus(a) === "running" ? 0 : 1;
           const bRunning = workspaceStatus(b) === "running" ? 0 : 1;
           if (aRunning !== bRunning) return aRunning - bRunning;

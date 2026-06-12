@@ -28,6 +28,25 @@ export interface AppStatus {
   message?: string;
   /** External resource the agent produced (typically a PR URL). */
   uri?: string;
+  needsUserAttention?: boolean;
+}
+
+export interface AgentInfo {
+  name: string;
+  status: string;
+  lifecycleState: string;
+  healthReason?: string;
+  arch?: string;
+  os?: string;
+  version?: string;
+  latencyMs?: number;
+  startupDurationMs?: number;
+  scripts?: Array<{ displayName?: string; status?: string; exitCode?: number | null }>;
+}
+
+export interface ResourceMeta {
+  key: string;
+  value: string;
 }
 
 export interface WorkspaceInfo {
@@ -35,15 +54,41 @@ export interface WorkspaceInfo {
   status: string;
   healthy: boolean;
   outdated: boolean;
+  favorite?: boolean;
   buildAge: string;
   lastBuildAt: string;
+  lastUsedAt?: string;
   templateName: string;
+  templateDisplayName?: string;
+  templateIcon?: string;
   sessions: string[];
   dashboard?: string;
   terminal?: string;
   apps?: WorkspaceApp[];
   task?: TaskInfo;
   appStatus?: AppStatus;
+  /** Why the latest build was triggered. */
+  buildReason?: string;
+  /** Daily cost units (if deployment uses quotas). */
+  dailyCost?: number;
+  /** ISO timestamp when the running workspace will auto-stop. */
+  autoStopAt?: string;
+  /** Cron schedule for auto-start (if set). */
+  autostartSchedule?: string;
+  /** Whether template updates are applied automatically. */
+  automaticUpdates?: string;
+  /** ISO timestamp if the workspace is dormant. */
+  dormantAt?: string;
+  /** ISO timestamp if the workspace is scheduled for deletion. */
+  deletingAt?: string;
+  /** Primary agent details (arch, OS, latency, etc.). */
+  agent?: AgentInfo;
+  /** Template-defined resource metadata (CPU, RAM, etc.). */
+  resourceMeta?: ResourceMeta[];
+  /** Build job queue position when pending. */
+  queuePosition?: number;
+  /** Build job error message (if failed). */
+  buildError?: string;
 }
 
 export interface LayoutInfo {

@@ -10,6 +10,8 @@ import {
   updateWorkspace,
   waitForWorkspace,
   workspaceStatus,
+  favoriteWorkspace,
+  unfavoriteWorkspace,
   type CoderWorkspace,
 } from "./coder.ts";
 import { formatLogForSpinner, printCoderFailure } from "./coder-ui.ts";
@@ -66,6 +68,30 @@ function isStopped(ws: CoderWorkspace): boolean {
 
 export const WORKSPACE_ACTIONS: WorkspaceAction[] = [
   // ── Navigation ──
+  {
+    id: "favorite",
+    label: "Pin / unpin",
+    group: "navigation",
+    hint: ({ ws }) => (ws.favorite ? "★ pinned — unpin to remove from top" : "pin to the top of lists"),
+    isAvailable: () => true,
+    async run({ ws }) {
+      const pinned = !!ws.favorite;
+      const spinner = p.spinner();
+      const verb = pinned ? "Unpinning" : "Pinning";
+      spinner.start(`${verb} ${pc.bold(ws.name)}`);
+      try {
+        if (pinned) {
+          await unfavoriteWorkspace(ws.name);
+        } else {
+          await favoriteWorkspace(ws.name);
+        }
+        spinner.stop(`${pc.bold(ws.name)} ${pinned ? "unpinned" : "pinned"}`);
+      } catch (err) {
+        spinner.error(`Failed to ${pinned ? "unpin" : "pin"} ${pc.bold(ws.name)}`);
+        throw err;
+      }
+    },
+  },
   {
     id: "open-app",
     label: "Open app",

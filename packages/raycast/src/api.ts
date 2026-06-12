@@ -134,6 +134,14 @@ export function downLayout(layout: string, stop = false) {
   });
 }
 
+export function favoriteWorkspace(workspace: string, favorite: boolean) {
+  return request<{ ok: boolean; error?: string }>("/api/favorite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace, favorite }),
+  });
+}
+
 export function startWorkspace(workspace: string) {
   return request<{ ok: boolean }>("/api/start", {
     method: "POST",

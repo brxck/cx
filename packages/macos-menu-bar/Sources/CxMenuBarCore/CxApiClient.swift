@@ -49,6 +49,11 @@ public final class CxApiClient {
         self.session = session
     }
 
+    /// Base URL of the `cx serve` web UI, for opening in a browser.
+    public var webURL: URL {
+        URL(string: "http://\(host):\(port)")!
+    }
+
     public func getStatus() async throws -> StatusResponse {
         try await request("/api/status")
     }
@@ -76,6 +81,11 @@ public final class CxApiClient {
 
     public func updateWorkspace(_ workspace: String) async throws -> ActionResponse {
         try await streamAction("/api/update", body: ["workspace": workspace])
+    }
+
+    public func setFavorite(_ workspace: String, favorite: Bool) async throws -> ActionResponse {
+        let body = try JSONEncoder().encode(FavoriteRequest(workspace: workspace, favorite: favorite))
+        return try await postAction("/api/favorite", jsonBody: body)
     }
 
     public func reloadApiKey() {
@@ -119,6 +129,35 @@ public final class CxApiClient {
 
     private func postAction(_ path: String, body: [String: String]) async throws -> ActionResponse {
         let request = try makeRequest(path, method: "POST", body: body)
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw CxApiError.unreachable(String(describing: error))
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw CxApiError.invalidResponse
+        }
+        if http.statusCode == 401 {
+            throw CxApiError.unauthorized
+        }
+
+        if let action = try? JSONDecoder().decode(ActionResponse.self, from: data) {
+            return action
+        }
+
+        if !(200..<300).contains(http.statusCode) {
+            throw CxApiError.httpStatus(http.statusCode, httpErrorDetail(from: data, response: http))
+        }
+
+        return ActionResponse(ok: true)
+    }
+
+    private func postAction(_ path: String, jsonBody: Data) async throws -> ActionResponse {
+        let request = try makeRequest(path, method: "POST", jsonBody: jsonBody)
         let data: Data
         let response: URLResponse
 
@@ -226,6 +265,29 @@ public final class CxApiClient {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(body)
         }
+
+        return request
+    }
+
+    private func makeRequest(
+        _ path: String,
+        method: String,
+        jsonBody: Data
+    ) throws -> URLRequest {
+        guard let url = URL(string: "http://\(host):\(port)\(path)") else {
+            throw CxApiError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+
+        let key = readApiKey()
+        if !key.isEmpty {
+            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        }
+
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonBody
 
         return request
     }

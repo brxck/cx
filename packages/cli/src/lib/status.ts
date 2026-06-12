@@ -38,6 +38,7 @@ export interface LayoutStatus {
   coderStatus: string;
   coderHealthy: boolean;
   coderOutdated: boolean;
+  coderFavorite: boolean;
   coderBuildAge: string;
   coderTemplateName: string | null;
   cmuxRef: string;
@@ -120,6 +121,7 @@ export function buildLayoutStatuses(
       coderStatus: coder ? workspaceStatus(coder) : "unknown",
       coderHealthy: coder?.health.healthy ?? false,
       coderOutdated: coder?.outdated ?? false,
+      coderFavorite: coder?.favorite ?? false,
       coderBuildAge: coder ? relativeTime(coder.latest_build.created_at) : "?",
       coderTemplateName: coder?.template_name ?? null,
       cmuxRef: layout.cmux_id,

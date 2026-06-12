@@ -440,6 +440,7 @@ Set per-template or overridden at `up` time.
 | POST | `/api/restart` | `{ workspace }` | SSE stream |
 | POST | `/api/update` | `{ workspace }` | SSE stream |
 | POST | `/api/activate` | `{ layout }` | `{ ok, layout }` |
+| POST | `/api/favorite` | `{ workspace, favorite }` | `{ ok }` |
 
 All non-streaming endpoints return `{ ok: false, error }` on failure with an HTTP status of 400/404/409/500. SSE streams emit a final `{stage: "done"}` or `{stage: "error", message}` event.
 

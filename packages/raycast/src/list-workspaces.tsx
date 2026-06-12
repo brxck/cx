@@ -16,6 +16,7 @@ import {
   apiUrl,
   authedInit,
   downLayout,
+  favoriteWorkspace,
   getApps,
   restartWorkspace,
   startWorkspace,
@@ -46,11 +47,27 @@ function pickLayout(layouts: LayoutInfo[]): LayoutInfo | undefined {
   return [...layouts].sort((a, b) => (a.activeAt > b.activeAt ? -1 : 1))[0];
 }
 
+function timeUntil(iso: string): string {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return "now";
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
 function buildAccessories(
   workspace: WorkspaceInfo,
   layout: LayoutInfo | undefined,
 ): List.Item.Accessory[] {
   const accessories: List.Item.Accessory[] = [];
+  if (workspace.favorite) {
+    accessories.push({
+      icon: { source: Icon.Star, tintColor: Color.Yellow },
+      tooltip: "Favorite",
+    });
+  }
   if (layout?.branch) {
     accessories.push({
       tag: { value: layout.branch, color: Color.Blue },
@@ -64,10 +81,48 @@ function buildAccessories(
       tooltip: `${workspace.sessions.length} ZMX session${workspace.sessions.length === 1 ? "" : "s"}`,
     });
   }
+  if (workspace.agent?.latencyMs != null) {
+    accessories.push({
+      tag: { value: `${Math.round(workspace.agent.latencyMs)}ms`, color: Color.SecondaryText },
+      icon: Icon.Signal1,
+      tooltip: "DERP latency",
+    });
+  }
+  if (workspace.appStatus?.message) {
+    const stateIcons: Record<string, Icon> = {
+      working: Icon.Hourglass,
+      complete: Icon.CheckCircle,
+      failure: Icon.XMarkCircle,
+      idle: Icon.Minus,
+    };
+    accessories.push({
+      tag: { value: workspace.appStatus.message, color: Color.PrimaryText },
+      icon: stateIcons[workspace.appStatus.state ?? ""] ?? Icon.Minus,
+      tooltip: `Agent: ${workspace.appStatus.state ?? "unknown"} — ${workspace.appStatus.message}`,
+    });
+  }
+  if (workspace.dormantAt) {
+    accessories.push({
+      icon: { source: Icon.Moon, tintColor: Color.Yellow },
+      tooltip: "Dormant",
+    });
+  }
+  if (workspace.deletingAt) {
+    accessories.push({
+      icon: { source: Icon.Trash, tintColor: Color.Red },
+      tooltip: `Deleting in ${timeUntil(workspace.deletingAt)}`,
+    });
+  }
   if (!workspace.healthy) {
     accessories.push({
       icon: { source: Icon.Warning, tintColor: Color.Red },
-      tooltip: "Unhealthy",
+      tooltip: workspace.agent?.healthReason || "Unhealthy",
+    });
+  }
+  if (workspace.autoStopAt && workspace.status === "running") {
+    accessories.push({
+      tag: { value: `⏱${timeUntil(workspace.autoStopAt)}`, color: Color.SecondaryText },
+      tooltip: `Auto-stops at ${workspace.autoStopAt}`,
     });
   }
   accessories.push({
@@ -84,14 +139,43 @@ function workspaceDetailMarkdown(
   layouts: LayoutInfo[],
 ): string {
   const lines: string[] = [];
-  lines.push(`# ${ws.name}`, "");
-  lines.push(`**Template:** ${ws.templateName}`);
+  lines.push(`# ${ws.favorite ? "⭐ " : ""}${ws.task?.displayName ?? ws.name}`, "");
+  if (ws.task) lines.push(`**Workspace:** ${ws.name}`);
+  lines.push(`**Template:** ${ws.templateDisplayName || ws.templateName}`);
   lines.push(`**Status:** ${ws.status}`);
   lines.push(`**Healthy:** ${ws.healthy ? "yes" : "no"}`);
-  lines.push(`**Outdated:** ${ws.outdated ? "yes" : "no"}`);
-  lines.push(`**Build age:** ${ws.buildAge}`);
+  if (!ws.healthy && ws.agent?.healthReason) {
+    lines.push(`**Health reason:** ${ws.agent.healthReason}`);
+  }
+  if (ws.appStatus?.message) {
+    lines.push(`**Agent activity:** ${ws.appStatus.state ?? "unknown"} — ${ws.appStatus.message}`);
+  }
+  lines.push(`**Last active:** ${ws.buildAge} ago`);
+  if (ws.buildReason) lines.push(`**Build reason:** ${ws.buildReason}`);
+  if (ws.dailyCost) lines.push(`**Daily cost:** ${ws.dailyCost}`);
+  if (ws.autoStopAt) lines.push(`**Auto-stop:** ${timeUntil(ws.autoStopAt)}`);
+  if (ws.autostartSchedule) lines.push(`**Autostart:** \`${ws.autostartSchedule}\``);
+  if (ws.automaticUpdates) lines.push(`**Auto-updates:** ${ws.automaticUpdates}`);
+  if (ws.dormantAt) lines.push(`**⚠️ Dormant since:** ${ws.dormantAt}`);
+  if (ws.deletingAt) lines.push(`**🗑️ Scheduled deletion:** ${ws.deletingAt}`);
+  if (ws.buildError) lines.push(`**❌ Build error:** ${ws.buildError}`);
   if (ws.sessions.length) {
     lines.push(`**Sessions:** ${ws.sessions.join(", ")}`);
+  }
+  if (ws.agent) {
+    lines.push("", "## Agent", "");
+    lines.push(`- **Name:** ${ws.agent.name}`);
+    lines.push(`- **Status:** ${ws.agent.status} (${ws.agent.lifecycleState})`);
+    if (ws.agent.arch) lines.push(`- **Platform:** ${ws.agent.os}/${ws.agent.arch}`);
+    if (ws.agent.version) lines.push(`- **Version:** ${ws.agent.version}`);
+    if (ws.agent.latencyMs != null) lines.push(`- **Latency:** ${Math.round(ws.agent.latencyMs)}ms`);
+    if (ws.agent.startupDurationMs != null) lines.push(`- **Startup:** ${(ws.agent.startupDurationMs / 1000).toFixed(1)}s`);
+  }
+  if (ws.resourceMeta && ws.resourceMeta.length > 0) {
+    lines.push("", "## Resources", "");
+    for (const m of ws.resourceMeta) {
+      lines.push(`- **${m.key}:** ${m.value}`);
+    }
   }
   if (layouts.length) {
     lines.push("", "## Layouts", "");
@@ -120,7 +204,7 @@ function WorkspaceDetail({
   return (
     <Detail
       markdown={workspaceDetailMarkdown(ws, layouts)}
-      navigationTitle={ws.name}
+      navigationTitle={ws.task?.displayName ?? ws.name}
     />
   );
 }
@@ -177,11 +261,15 @@ export default function Command() {
 
   const STALE_STOPPED_MS = 24 * 60 * 60 * 1000;
   const allWorkspaces = data?.workspaces ?? [];
-  const workspaces = allWorkspaces.filter((ws) => {
-    if (ws.status !== "stopped") return true;
-    const age = Date.now() - new Date(ws.lastBuildAt).getTime();
-    return age <= STALE_STOPPED_MS;
-  });
+  const workspaces = allWorkspaces
+    .filter((ws) => {
+      if (ws.favorite) return true;
+      if (ws.status !== "stopped") return true;
+      const ref = ws.lastUsedAt || ws.lastBuildAt;
+      const age = Date.now() - new Date(ref).getTime();
+      return age <= STALE_STOPPED_MS;
+    })
+    .sort((a, b) => (a.favorite ? 0 : 1) - (b.favorite ? 0 : 1));
   const layoutsByWs = new Map<string, LayoutInfo[]>();
   for (const layout of data?.layouts ?? []) {
     const list = layoutsByWs.get(layout.coderWs) ?? [];
@@ -202,8 +290,8 @@ export default function Command() {
           <List.Item
             key={ws.name}
             icon={statusIcon(ws)}
-            title={ws.name}
-            subtitle={layout?.name ?? ws.templateName}
+            title={ws.task?.displayName ?? ws.name}
+            subtitle={ws.task ? ws.name : (layout?.name ?? ws.templateName)}
             accessories={buildAccessories(ws, layout)}
             actions={
               <ActionPanel>
@@ -263,6 +351,22 @@ export default function Command() {
                   icon={Icon.Info}
                   shortcut={{ modifiers: ["cmd"], key: "i" }}
                   target={<WorkspaceDetail ws={ws} layouts={wsLayouts} />}
+                />
+
+                <Action
+                  title={ws.favorite ? "Unpin" : "Pin to Top"}
+                  icon={{
+                    source: ws.favorite ? Icon.StarDisabled : Icon.Star,
+                    tintColor: Color.Yellow,
+                  }}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
+                  onAction={() =>
+                    runAction(
+                      ws.favorite ? "Unpin" : "Pin",
+                      () => favoriteWorkspace(ws.name, !ws.favorite),
+                      revalidate,
+                    )
+                  }
                 />
 
                 <ActionPanel.Section title="Lifecycle">

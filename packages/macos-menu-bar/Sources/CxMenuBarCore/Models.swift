@@ -78,6 +78,7 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
     public var status: String
     public var healthy: Bool
     public var outdated: Bool
+    public var favorite: Bool?
     public var buildAge: String
     public var lastBuildAt: String
     public var templateName: String
@@ -93,6 +94,7 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
         status: String,
         healthy: Bool,
         outdated: Bool,
+        favorite: Bool? = nil,
         buildAge: String,
         lastBuildAt: String,
         templateName: String,
@@ -107,6 +109,7 @@ public struct WorkspaceInfo: Codable, Equatable, Identifiable, Sendable {
         self.status = status
         self.healthy = healthy
         self.outdated = outdated
+        self.favorite = favorite
         self.buildAge = buildAge
         self.lastBuildAt = lastBuildAt
         self.templateName = templateName
@@ -189,4 +192,9 @@ public struct ActivateLayoutResponse: Codable, Equatable, Sendable {
 
 struct ErrorResponse: Codable {
     var error: String?
+}
+
+struct FavoriteRequest: Codable {
+    var workspace: String
+    var favorite: Bool
 }

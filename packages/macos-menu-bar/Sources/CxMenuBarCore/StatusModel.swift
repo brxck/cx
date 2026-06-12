@@ -14,6 +14,11 @@ public final class StatusModel {
         self.client = client
     }
 
+    /// Base URL of the `cx serve` web UI, for opening in a browser.
+    public var webURL: URL {
+        client.webURL
+    }
+
     public var statusBarState: StatusBarState {
         if let error {
             return .degraded("?", tooltip: error.menuTitle)
@@ -72,6 +77,12 @@ public final class StatusModel {
     public func updateWorkspace(_ workspace: String) async -> ActionResponse {
         await performAndRefresh {
             try await client.updateWorkspace(workspace)
+        }
+    }
+
+    public func setFavorite(_ workspace: String, favorite: Bool) async -> ActionResponse {
+        await performAndRefresh {
+            try await client.setFavorite(workspace, favorite: favorite)
         }
     }
 

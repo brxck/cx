@@ -44,9 +44,11 @@ export function Dashboard() {
   const STALE_STOPPED_MS = 24 * 60 * 60 * 1000;
   const allWorkspaces = data?.workspaces ?? [];
   const visible = allWorkspaces.filter((ws) => {
-    if (ws.task) return true; // tasks always show, even when stale/stopped
+    if (ws.favorite) return true;
+    if (ws.task) return true;
     if (ws.status !== "stopped") return true;
-    const age = Date.now() - new Date(ws.lastBuildAt).getTime();
+    const ref = ws.lastUsedAt || ws.lastBuildAt;
+    const age = Date.now() - new Date(ref).getTime();
     return age <= STALE_STOPPED_MS;
   });
 
@@ -56,7 +58,11 @@ export function Dashboard() {
   const workspaces = visible.filter((ws) =>
     filter === "tasks" ? !!ws.task : filter === "workspaces" ? !ws.task : true,
   );
-  workspaces.sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1));
+  workspaces.sort((a, b) => {
+    // Favorites first, then running, then by recency (already sorted by server)
+    if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+    return (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1);
+  });
 
   const segments: { key: Filter; label: string; count: number }[] = [
     { key: "all", label: "All", count: visible.length },

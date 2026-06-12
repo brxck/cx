@@ -84,6 +84,10 @@ public extension WorkspaceInfo {
         status == "running"
     }
 
+    var isFavorite: Bool {
+        favorite ?? false
+    }
+
     var sortedApps: [WorkspaceApp] {
         (apps ?? []).sorted { left, right in
             let labelOrder = menuStringCompare(left.label, right.label)
@@ -115,6 +119,13 @@ public extension WorkspaceInfo {
 public extension StatusResponse {
     var sortedWorkspaces: [WorkspaceInfo] {
         workspaces.sorted { left, right in
+            // Pinned (Coder favorite) workspaces float to the top.
+            let leftFav = left.isFavorite ? 0 : 1
+            let rightFav = right.isFavorite ? 0 : 1
+            if leftFav != rightFav {
+                return leftFav < rightFav
+            }
+
             let leftRunning = left.isRunning ? 0 : 1
             let rightRunning = right.isRunning ? 0 : 1
             if leftRunning != rightRunning {
@@ -133,14 +144,20 @@ public extension StatusResponse {
         sortedWorkspaces.filter(\.isRunning)
     }
 
-    /// Running workspaces that back a Coder task, surfaced under the Tasks group.
-    var taskWorkspaces: [WorkspaceInfo] {
-        runningWorkspaces.filter { $0.task != nil }
+    /// Workspaces surfaced in the menu: everything running, plus pinned
+    /// workspaces regardless of status so a pin always stays visible.
+    var menuWorkspaces: [WorkspaceInfo] {
+        sortedWorkspaces.filter { $0.isRunning || $0.isFavorite }
     }
 
-    /// Running workspaces with no associated task, surfaced under the Workspaces group.
+    /// Menu workspaces that back a Coder task, surfaced under the Tasks group.
+    var taskWorkspaces: [WorkspaceInfo] {
+        menuWorkspaces.filter { $0.task != nil }
+    }
+
+    /// Menu workspaces with no associated task, surfaced under the Workspaces group.
     var plainWorkspaces: [WorkspaceInfo] {
-        runningWorkspaces.filter { $0.task == nil }
+        menuWorkspaces.filter { $0.task == nil }
     }
 
     var unhealthyRunningCount: Int {

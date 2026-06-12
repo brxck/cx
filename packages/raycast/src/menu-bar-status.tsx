@@ -16,6 +16,7 @@ import {
   apiUrl,
   activateLayout,
   authedInit,
+  favoriteWorkspace,
   restartWorkspace,
   startWorkspace,
   stopWorkspace,
@@ -120,6 +121,9 @@ export default function Command() {
   }
 
   const running = workspaces.filter((w) => w.status === "running");
+  const pinned = workspaces.filter((w) => w.favorite);
+  // Running workspaces that aren't already shown under Pinned.
+  const runningUnpinned = running.filter((w) => !w.favorite);
   const unhealthy = running.filter((w) => !w.healthy).length;
   const title = unhealthy > 0 ? `${running.length}!` : `${running.length}`;
   const tooltip =
@@ -142,8 +146,16 @@ export default function Command() {
             ? { source: Icon.Eye, tintColor: Color.Blue }
             : workspaceIcon(ws)
         }
-        title={`${ws.name}${titleSuffix}`}
+        title={`${ws.task?.displayName ?? ws.name}${titleSuffix}`}
       >
+        {ws.appStatus?.message ? (
+          <MenuBarExtra.Item
+            title={ws.appStatus.message}
+            icon={ws.appStatus.state === "working" ? Icon.Hourglass : ws.appStatus.state === "complete" ? Icon.CheckCircle : ws.appStatus.state === "failure" ? Icon.XMarkCircle : Icon.Minus}
+            tooltip={`Agent: ${ws.appStatus.state ?? "unknown"}`}
+          />
+        ) : null}
+
         {layout ? (
           <MenuBarExtra.Item
             title="Activate Layout"
@@ -230,6 +242,19 @@ export default function Command() {
               revalidate();
             }}
           />
+          <MenuBarExtra.Item
+            title={ws.favorite ? "Unpin" : "Pin to Top"}
+            icon={{
+              source: ws.favorite ? Icon.StarDisabled : Icon.Star,
+              tintColor: Color.Yellow,
+            }}
+            onAction={async () => {
+              await runHud(ws.favorite ? `Unpinning ${ws.name}` : `Pinning ${ws.name}`, () =>
+                favoriteWorkspace(ws.name, !ws.favorite),
+              );
+              revalidate();
+            }}
+          />
         </MenuBarExtra.Section>
 
         <MenuBarExtra.Item
@@ -253,9 +278,15 @@ export default function Command() {
       tooltip={tooltip}
       isLoading={isLoading}
     >
-      {running.length > 0 ? (
+      {pinned.length > 0 ? (
+        <MenuBarExtra.Section title={`Pinned · ${pinned.length}`}>
+          {pinned.map(renderWorkspace)}
+        </MenuBarExtra.Section>
+      ) : null}
+
+      {runningUnpinned.length > 0 ? (
         <MenuBarExtra.Section title={`Running · ${running.length}`}>
-          {running.map(renderWorkspace)}
+          {runningUnpinned.map(renderWorkspace)}
         </MenuBarExtra.Section>
       ) : null}
 

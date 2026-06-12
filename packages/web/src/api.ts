@@ -32,16 +32,49 @@ export interface TaskInfo {
   url?: string;
 }
 
+export interface AgentInfo {
+  name: string;
+  status: string;
+  lifecycleState: string;
+  healthReason?: string;
+  arch?: string;
+  os?: string;
+  version?: string;
+  latencyMs?: number;
+  startupDurationMs?: number;
+}
+
+export interface ResourceMeta {
+  key: string;
+  value: string;
+}
+
 export interface WorkspaceInfo {
   name: string;
   status: string;
   healthy: boolean;
   outdated: boolean;
+  favorite?: boolean;
   buildAge: string;
   lastBuildAt: string;
+  lastUsedAt?: string;
   templateName: string;
+  templateDisplayName?: string;
+  templateIcon?: string;
   sessions: string[];
   task?: TaskInfo;
+  appStatus?: { state?: string; message?: string; uri?: string; needsUserAttention?: boolean };
+  buildReason?: string;
+  dailyCost?: number;
+  autoStopAt?: string;
+  autostartSchedule?: string;
+  automaticUpdates?: string;
+  dormantAt?: string;
+  deletingAt?: string;
+  agent?: AgentInfo;
+  resourceMeta?: ResourceMeta[];
+  queuePosition?: number;
+  buildError?: string;
 }
 
 export interface TemplateEntry {
@@ -184,6 +217,18 @@ export async function stopWorkspace(workspace: string): Promise<{ ok: boolean; e
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ workspace }),
+  });
+  return res.json() as Promise<{ ok: boolean; error?: string }>;
+}
+
+export async function favoriteWorkspace(
+  workspace: string,
+  favorite: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await cxFetch("/api/favorite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace, favorite }),
   });
   return res.json() as Promise<{ ok: boolean; error?: string }>;
 }
