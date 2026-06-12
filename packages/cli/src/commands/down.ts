@@ -141,20 +141,20 @@ async function resolveShouldStop(
   if (stopFlag) return true;
   if (keepFlag) return false;
 
-  const isEphemeral = layout.type === "ephemeral";
+  const isTask = layout.type === "task";
 
   const choice = await p.select({
-    message: `${isEphemeral ? "Ephemeral" : "Persistent"} layout — stop Coder workspace?`,
+    message: `${isTask ? "Task" : "Persistent"} layout — stop Coder workspace?`,
     options: [
       {
-        value: isEphemeral,
-        label: isEphemeral
-          ? `${pc.bold("Stop workspace")} ${pc.dim("(default for ephemeral)")}`
+        value: isTask,
+        label: isTask
+          ? `${pc.bold("Stop workspace")} ${pc.dim("(default for task)")}`
           : `${pc.bold("Keep workspace running")} ${pc.dim("(default for persistent)")}`,
       },
       {
-        value: !isEphemeral,
-        label: isEphemeral
+        value: !isTask,
+        label: isTask
           ? "Keep workspace running"
           : "Stop workspace",
       },

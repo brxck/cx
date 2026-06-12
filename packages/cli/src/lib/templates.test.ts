@@ -53,7 +53,7 @@ function jsonSource(config: Partial<TemplateConfig> = {}): TemplateSource {
   const full: TemplateConfig = {
     name: "json-test",
     coder: { template: "coder-t" },
-    type: "ephemeral",
+    type: "task",
     layout: { pane: { surfaces: [{ type: "terminal" }] } },
     ...config,
   };
@@ -83,7 +83,7 @@ describe("templateDisplay", () => {
   it("reports dynamic=true for JS templates without meta", () => {
     const src = jsSource(async () => ({
       coder: { template: "t" },
-      type: "ephemeral",
+      type: "task",
       layout: { pane: { surfaces: [] } },
     }));
     expect(templateDisplay(src).dynamic).toBe(true);
@@ -150,7 +150,7 @@ describe("materializeTemplate — JS source, static layout/ports", () => {
       const branch = await input.text("branch", { default: "main" });
       return {
         coder: { template: "coder-t", parameters: { branch } },
-        type: "ephemeral",
+        type: "task",
         layout: { pane: { surfaces: [{ type: "terminal", command: `echo ${branch}` }] } },
         ports: [`3000:3000`],
       };
@@ -176,7 +176,7 @@ describe("materializeTemplate — JS source, dynamic layout fn", () => {
     let factoryCalls = 0;
     const fn: TemplateFn = async () => ({
       coder: { template: "coder-t" },
-      type: "ephemeral",
+      type: "task",
       layout: async ({ workspace }) => ({
         pane: { surfaces: [{ type: "browser", url: workspace.appUrl("vscode") }] },
       }),
@@ -197,7 +197,7 @@ describe("materializeTemplate — JS source, dynamic layout fn", () => {
   it("throws when layout is a fn but finalize has no workspace", async () => {
     const fn: TemplateFn = async () => ({
       coder: { template: "coder-t" },
-      type: "ephemeral",
+      type: "task",
       layout: async () => ({ pane: { surfaces: [] } }),
     });
     const src = jsSource(fn);
@@ -214,7 +214,7 @@ describe("prepareTemplate — persistedVars feeds JS inputs", () => {
       const branch = await input.text("branch", { default: "main" });
       return {
         coder: { template: "coder-t" },
-        type: "ephemeral",
+        type: "task",
         layout: { pane: { surfaces: [{ type: "terminal", command: `${branch}:${port}` }] } },
       };
     };
@@ -235,7 +235,7 @@ describe("materializeTemplate — non-interactive mode (restore)", () => {
       const port = await input.number("port", { default: 3000 });
       return {
         coder: { template: "coder-t" },
-        type: "ephemeral",
+        type: "task",
         layout: { pane: { surfaces: [{ type: "terminal", command: `${branch}:${port}` }] } },
       };
     };
@@ -251,7 +251,7 @@ describe("materializeTemplate — non-interactive mode (restore)", () => {
       const branch = await input.text("branch");
       return {
         coder: { template: "coder-t" },
-        type: "ephemeral",
+        type: "task",
         layout: { pane: { surfaces: [{ type: "terminal", command: branch }] } },
       };
     };

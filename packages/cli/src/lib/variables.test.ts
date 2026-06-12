@@ -6,7 +6,7 @@ function makeTemplate(overrides: Partial<TemplateConfig> = {}): TemplateConfig {
   return {
     name: "test",
     coder: { template: "test-template" },
-    type: "ephemeral",
+    type: "task",
     layout: { pane: { surfaces: [{ type: "terminal" }] } },
     ...overrides,
   };

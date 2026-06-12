@@ -88,7 +88,7 @@ Re-establish a single layout after a restart. Resolves the target by exact name,
 Create a **Coder Task** — an agent session that runs in its own ephemeral Coder workspace and (per the system prompt) opens a draft PR. cx reduces this to a single `coder task create -q --template <coderTemplate> --preset <preset> '<systemPrompt>\n\n---\n\n<userPrompt>'`, where the coder template, preset, and system prompt come from a chosen cx template.
 
 - The prompt is read from the positional argument (quote multi-word prompts), one or more files via `--file`/`-f` (comma-separate multiple), piped stdin, or `$EDITOR`/`$VISUAL` (fallback `vim`) via `--editor` (lines starting with `#` are stripped). Files and stdin act as context and a positional is the instruction; when both are present the context is wrapped as `<context>…</context>` ahead of the instruction, and when only context is supplied it becomes the prompt verbatim.
-- The cx template is resolved like `up` (project-local → global → interactive picker; `--template` to name it). The template's `systemPrompt` field (JSON `config.systemPrompt` or JS `meta.systemPrompt`, read **statically**) is prepended; `--system-prompt` overrides it; absent either, a built-in `DEFAULT_TASK_SYSTEM_PROMPT` is used.
+- The cx template is resolved like `up` (project-local → global → interactive picker; `--template` to name it), but only **task templates** are eligible: the template must declare `type: "task"` and a coder template **statically** (JSON `config` or JS `meta`). Persistent templates and purely-dynamic JS templates (no static `meta`) are hidden from the picker and rejected when named. The template's `systemPrompt` field (JSON `config.systemPrompt` or JS `meta.systemPrompt`, read **statically**) is prepended; `--system-prompt` overrides it; absent either, a built-in `DEFAULT_TASK_SYSTEM_PROMPT` is used.
 - The raw user prompt is saved to `~/.cx/prompts/<id>.md`. The task id, dashboard URL, and `coder task logs <id>` hint are printed.
 
 A task is just a Coder workspace, so the regular commands cover the rest: `cx list` to browse tasks/workspaces, `cx ssh <workspace>` or `cx attach <workspace>` to jump in, `coder task logs <id>` for the agent transcript.
@@ -96,7 +96,7 @@ A task is just a Coder workspace, so the regular commands cover the rest: `cx li
 Templates can define the system prompt per-template:
 
 ```json
-{ "name": "fix", "coder": { "template": "owner-dev", "preset": "Dev: Standard" }, "type": "ephemeral",
+{ "name": "fix", "coder": { "template": "owner-dev", "preset": "Dev: Standard" }, "type": "task",
   "systemPrompt": "You are fixing a bug. Open a draft PR when done.", "layout": { ... } }
 ```
 
@@ -120,6 +120,7 @@ Manage port forwarding for a Coder workspace. Resolves workspace first (since fo
 - `--udp <mapping>` — start UDP forward(s)
 - `--stop` — stop all active forwards for the workspace
 - `--template` — start forwards defined in the workspace's layout template
+- `--detect` / `-d` — discover the ports the workspace is currently listening on (via the Coder API), printing each port's Coder subdomain URL; open one with `cx open <workspace> -t <port>`
 
 Interactive mode shows currently running forwards, presets (annotated "forwarded" or "in use"), a "Start template ports" action when the workspace has a layout with template ports, a "Stop all active forwards" action when any are running, and a custom mapping prompt. All forwards run as detached `coder port-forward` processes.
 
@@ -129,9 +130,13 @@ Run a one-off command on a workspace without a full SSH session. Useful for quic
 
 #### `coder open [workspace]`
 
-Open any workspace app — Dashboard, VS Code, or custom apps defined in the Coder template. Available apps are discovered from the workspace's agent config. Interactively pick the app if no `--target` given.
+Open any workspace app — Dashboard, VS Code, or custom apps defined in the Coder template — plus the workspace's live listening ports. Apps are discovered from the agent config; ports are discovered via the Coder listening-ports API and opened through their Coder port subdomain (`{port}--{agent}--{workspace}--{owner}.{host}`). Interactively pick the target if no `--target` given.
 
-- `--target <slug>` / `-t` — app slug to open directly (e.g. `dashboard`, `vscode`, or any custom app slug)
+- `--target <slug>` / `-t` — app slug (e.g. `dashboard`, `vscode`) or listening port (e.g. `3000`, `port:3000`) to open directly
+- `--in <default|cmux>` — open in the default browser or a cmux browser surface (ports and HTTP apps support both)
+- `--split <left|right|up|down>` — split a pane before opening into cmux (requires `--in cmux`)
+
+Port discovery is skipped when `--target` is an exact app slug, keeping scripted `-t dashboard`/`-t vscode` calls free of the extra API round-trip.
 
 #### `coder logs [workspace]`
 
@@ -348,7 +353,7 @@ A `cx.json` file in a project root (or git root) defines templates for that proj
 ```json
 {
   "templates": [
-    { "name": "frontend", "coder": { "template": "dev" }, "type": "ephemeral", "layout": { ... } },
+    { "name": "frontend", "coder": { "template": "dev" }, "type": "task", "layout": { ... } },
     { "name": "backend", "coder": { "template": "dev" }, "type": "persistent", "layout": { ... } }
   ]
 }
@@ -414,7 +419,7 @@ Background process that watches workspace agent health via the Coder API. Notifi
 
 Layouts fall into two categories that affect default behavior:
 
-- **Ephemeral** — one-off task workspaces. `down` defaults to stopping the workspace.
+- **Task** — one-off task workspaces. `down` defaults to stopping the workspace.
 - **Persistent** — long-lived development environments. `down` defaults to detach-only. Sessions are restored on `restore`.
 
 Set per-template or overridden at `up` time.

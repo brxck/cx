@@ -15,6 +15,7 @@ import {
  */
 export async function resolveSourceOrDefault(
   name: string | undefined,
+  opts?: { filter?: (source: TemplateSource) => boolean; noun?: string },
 ): Promise<{ source: TemplateSource; projectPath: string | null }> {
   await ensureDefaultsSeeded();
 
@@ -36,10 +37,17 @@ export async function resolveSourceOrDefault(
     origin: "project" | "global";
   };
 
-  const entries: PickerEntry[] = [
+  let entries: PickerEntry[] = [
     ...projectSources.map((s) => ({ source: s, origin: "project" as const })),
     ...globalSources.map((s) => ({ source: s, origin: "global" as const })),
   ];
+
+  if (opts?.filter) entries = entries.filter((e) => opts.filter!(e.source));
+
+  if (entries.length === 0) {
+    p.log.error(`No ${opts?.noun ?? "templates"} available.`);
+    process.exit(1);
+  }
 
   entries.sort((a, b) => a.source.name.localeCompare(b.source.name));
 

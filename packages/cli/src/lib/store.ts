@@ -96,7 +96,7 @@ export function _resetDb(path?: string): void {
 
 // --- Types ---
 
-export type LayoutType = "ephemeral" | "persistent";
+export type LayoutType = "task" | "persistent";
 
 export interface LayoutEntry {
   name: string;

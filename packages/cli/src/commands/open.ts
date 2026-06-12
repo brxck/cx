@@ -11,13 +11,16 @@ import {
   listOpenableApps,
   openWorkspaceApp,
   requireCoderLogin,
+  primaryAgent,
+  listeningPorts,
+  portSubdomainUrl,
   type CoderWorkspace,
 } from "../lib/coder.ts";
 import { pickWorkspace, pickLayout, fuzzyMatch } from "../lib/workspace-picker.ts";
 import * as cmux from "../lib/cmux.ts";
 import { getLayoutsByCoderWorkspace } from "../lib/store.ts";
 
-type AppKind = "dashboard" | "vscode" | "external-url" | "command" | "http";
+type AppKind = "dashboard" | "vscode" | "external-url" | "command" | "http" | "port";
 type Destination = "default" | "cmux";
 type SplitDir = "left" | "right" | "up" | "down";
 
@@ -26,6 +29,30 @@ interface TaggedApp {
   label: string;
   kind: AppKind;
   supports: Destination[];
+  /** Listening port number, for `kind: "port"` targets. */
+  port?: number;
+}
+
+/**
+ * Discover the workspace's live listening ports (via the Coder API) as openable
+ * targets. Each opens through its Coder port subdomain, in the browser or a cmux
+ * surface. Best-effort: returns [] if no agent or the API call fails.
+ */
+async function discoverPortTargets(ws: CoderWorkspace): Promise<TaggedApp[]> {
+  const agent = primaryAgent(ws);
+  if (!agent) return [];
+  try {
+    const ports = await listeningPorts(agent.id);
+    return ports.map((p) => ({
+      slug: `port:${p.port}`,
+      label: p.processName ? `${p.processName} ${pc.dim(`(${p.port})`)}` : `Port ${p.port}`,
+      kind: "port" as AppKind,
+      supports: ["default", "cmux"] as Destination[],
+      port: p.port,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 function tagApps(ws: CoderWorkspace): TaggedApp[] {
@@ -99,7 +126,11 @@ export interface RunOpenOpts {
 
 export async function runOpen(opts: RunOpenOpts): Promise<void> {
   const { ws } = opts;
-  const tagged = tagApps(ws);
+  const apps = tagApps(ws);
+  // Discover listening ports unless the target is an exact app slug (keeps
+  // scripted `-t dashboard`/`-t vscode` fast by skipping the network call).
+  const exactApp = opts.target ? apps.find((a) => a.slug === opts.target) : undefined;
+  const tagged = exactApp ? apps : [...apps, ...(await discoverPortTargets(ws))];
   const requestedIn = parseDestination(opts.in);
   const splitDir = parseSplitDir(opts.split);
 
@@ -164,6 +195,11 @@ export async function runOpen(opts: RunOpenOpts): Promise<void> {
     } else if (app.kind === "vscode") {
       consola.info(`Opening ${pc.bold(ws.name)} in VS Code...`);
       await openInVSCode(ws.name);
+    } else if (app.kind === "port") {
+      const baseUrl = await getCoderUrl();
+      const url = portSubdomainUrl({ ws, baseUrl, port: app.port! });
+      consola.info(`Opening ${pc.bold(ws.name)} port ${pc.bold(String(app.port))} in browser...`);
+      await openInBrowser(url);
     } else {
       consola.info(`Opening ${pc.bold(ws.name)} → ${pc.bold(app.slug)}...`);
       await openWorkspaceApp(ws.name, app.slug);
@@ -184,7 +220,9 @@ export async function runOpen(opts: RunOpenOpts): Promise<void> {
   const url =
     app.kind === "dashboard"
       ? (taskUi ?? dashboard)
-      : `${dashboard}/apps/${app.slug}/`;
+      : app.kind === "port"
+        ? portSubdomainUrl({ ws, baseUrl, port: app.port! })
+        : `${dashboard}/apps/${app.slug}/`;
 
   const layouts = getLayoutsByCoderWorkspace(ws.name);
   let cmuxWs: string | undefined;
@@ -227,7 +265,7 @@ export const openCommand = defineCommand({
     target: {
       type: "string",
       alias: "t",
-      description: "App slug (e.g. dashboard, vscode)",
+      description: "App slug (e.g. dashboard, vscode) or listening port (e.g. 3000, port:3000)",
       required: false,
     },
     in: {

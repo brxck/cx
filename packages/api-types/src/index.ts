@@ -51,7 +51,7 @@ export interface LayoutInfo {
   cmuxId: string;
   coderWs: string;
   template: string | null;
-  type: "ephemeral" | "persistent";
+  type: "task" | "persistent";
   branch: string | null;
   path: string | null;
   activeAt: string;

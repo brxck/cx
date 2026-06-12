@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { relativeTime, dashboardUrl, workspaceStatus, listOpenableApps, type CoderWorkspace } from "./coder.ts";
+import { relativeTime, dashboardUrl, workspaceStatus, listOpenableApps, primaryAgent, portSubdomainUrl, type CoderWorkspace } from "./coder.ts";
 
 describe("relativeTime", () => {
   it("returns seconds for recent timestamps", () => {
@@ -53,6 +53,53 @@ function makeWorkspace(overrides: {
     health: { healthy: true },
   } as CoderWorkspace;
 }
+
+describe("portSubdomainUrl", () => {
+  const ws = makeWorkspace({
+    status: "running",
+    transition: "start",
+    resources: [{ agents: [{ id: "a1", name: "main", status: "connected", lifecycle_state: "ready" }] }],
+  });
+
+  it("builds {port}--{agent}--{workspace}--{owner}.{host}", () => {
+    expect(portSubdomainUrl({ ws, baseUrl: "https://coder.dev.ownr.dev", port: 3000 })).toBe(
+      "https://3000--main--test--owner.coder.dev.ownr.dev",
+    );
+  });
+
+  it("preserves the base URL protocol and falls back to 'main' without an agent", () => {
+    const noAgent = makeWorkspace({ status: "running", transition: "start" });
+    expect(portSubdomainUrl({ ws: noAgent, baseUrl: "http://localhost:7080", port: 8080 })).toBe(
+      "http://8080--main--test--owner.localhost:7080",
+    );
+  });
+
+  it("honours an explicit agentName override", () => {
+    expect(portSubdomainUrl({ ws, baseUrl: "https://coder.dev", port: 5173, agentName: "dev" })).toBe(
+      "https://5173--dev--test--owner.coder.dev",
+    );
+  });
+});
+
+describe("primaryAgent", () => {
+  it("prefers a connected agent over the first", () => {
+    const ws = makeWorkspace({
+      status: "running",
+      transition: "start",
+      resources: [{
+        agents: [
+          { id: "a1", name: "first", status: "disconnected", lifecycle_state: "ready" },
+          { id: "a2", name: "second", status: "connected", lifecycle_state: "ready" },
+        ],
+      }],
+    });
+    expect(primaryAgent(ws)).toEqual({ id: "a2", name: "second" });
+  });
+
+  it("returns undefined when there are no agents", () => {
+    expect(primaryAgent(makeWorkspace({ status: "running", transition: "start" }))).toBeUndefined();
+  });
+});
 
 describe("workspaceStatus", () => {
   it("returns running for running+start", () => {

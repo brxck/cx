@@ -267,10 +267,34 @@ async function coderSessionToken(opts?: { forceMint?: boolean }): Promise<string
   return mintCoderToken();
 }
 
+/** Pick the primary agent for a workspace (first connected agent, else the first). */
+export function primaryAgent(ws: CoderWorkspace): { id: string; name: string } | undefined {
+  const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
+  const agent = agents.find((a) => a.status === "connected") ?? agents[0];
+  return agent ? { id: agent.id, name: agent.name } : undefined;
+}
+
 /** Pick the primary agent id for a workspace (first connected agent, else the first). */
 export function agentIdForWorkspace(ws: CoderWorkspace): string | undefined {
-  const agents = ws.latest_build.resources.flatMap((r) => r.agents ?? []);
-  return (agents.find((a) => a.status === "connected") ?? agents[0])?.id;
+  return primaryAgent(ws)?.id;
+}
+
+/**
+ * Build the Coder port-subdomain URL for a listening port, e.g.
+ * `https://3000--main--myws--brock.coder.dev.ownr.dev`. Coder serves the agent's
+ * port over the deployment's wildcard hostname using the same
+ * `{name}--{agent}--{workspace}--{owner}` scheme as named apps' `subdomain_name`.
+ */
+export function portSubdomainUrl(opts: {
+  ws: CoderWorkspace;
+  baseUrl: string;
+  port: number;
+  agentName?: string;
+}): string {
+  const agentName = opts.agentName ?? primaryAgent(opts.ws)?.name ?? "main";
+  const { protocol, host } = new URL(opts.baseUrl);
+  const sub = `${opts.port}--${agentName}--${opts.ws.name}--${opts.ws.owner_name}`;
+  return `${protocol}//${sub}.${host}`;
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   listWorkspaces as listCoderWorkspaces,
   agentIdForWorkspace,
   listeningPorts,
+  portSubdomainUrl,
   type CoderWorkspace,
   type ListeningPort,
 } from "../lib/coder.ts";
@@ -127,11 +128,14 @@ async function printListeningPorts(ws: CoderWorkspace): Promise<ListeningPort[]>
     return [];
   }
   consola.info(`Listening ports on ${pc.bold(ws.name)}:`);
+  const baseUrl = await getCoderUrl().catch(() => undefined);
   const width = Math.max(...ports.map((p) => String(p.port).length));
   for (const p of ports) {
     const proc = p.processName || pc.dim("(unknown)");
-    consola.log(`  ${pc.bold(String(p.port).padStart(width))}  ${pc.dim(p.network)}  ${proc}`);
+    const url = baseUrl ? `  ${pc.dim(portSubdomainUrl({ ws, baseUrl, port: p.port }))}` : "";
+    consola.log(`  ${pc.bold(String(p.port).padStart(width))}  ${pc.dim(p.network)}  ${proc}${url}`);
   }
+  consola.info(`Open one with ${pc.cyan(`cx open ${ws.name} -t <port>`)}`);
   return ports;
 }
 

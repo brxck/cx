@@ -21,7 +21,7 @@ export interface TemplateConfig {
     parameters?: Record<string, string>;
     preset?: string;
   };
-  type: "ephemeral" | "persistent";
+  type: "task" | "persistent";
   color?: string;
   ports?: string[];
   variables?: Record<string, TemplateVariable>;
@@ -59,7 +59,7 @@ export interface SurfaceConfig {
 export interface TemplateMeta {
   name?: string;
   coder?: { template: string; preset?: string };
-  type?: "ephemeral" | "persistent";
+  type?: "task" | "persistent";
   color?: string;
   description?: string;
   /** System prompt prepended to a user prompt when creating a Coder Task with `cx task`. Read statically. */
@@ -83,7 +83,7 @@ export interface TemplateReturn {
     parameters?: Record<string, string>;
     preset?: string;
   };
-  type: "ephemeral" | "persistent";
+  type: "task" | "persistent";
   color?: string;
   ports?: DynamicPorts;
   layout: DynamicLayout;
@@ -105,7 +105,7 @@ export type TemplateSource =
 export interface TemplateDisplay {
   name: string;
   coderTemplate: string | undefined;
-  type: "ephemeral" | "persistent" | undefined;
+  type: "task" | "persistent" | undefined;
   color?: string;
   dynamic: boolean;
 }
@@ -192,6 +192,43 @@ export function templateDisplay(source: TemplateSource): TemplateDisplay {
 export function templateSystemPrompt(source: TemplateSource): string | undefined {
   if (source.kind === "json") return source.config.systemPrompt;
   return source.meta?.systemPrompt;
+}
+
+/** Static coder + type config, read without executing a JS template's layout fn. */
+export interface StaticTaskConfig {
+  template?: string;
+  preset?: string;
+  type?: "task" | "persistent";
+}
+
+/**
+ * Read a template's coder template, preset, and type statically — JSON from
+ * `config`, JS from the static `meta` export. The JS layout fn is never run, so a
+ * purely dynamic template (no `meta`) yields `undefined` fields.
+ */
+export function staticTaskConfig(source: TemplateSource): StaticTaskConfig {
+  if (source.kind === "json") {
+    return {
+      template: source.config.coder.template,
+      preset: source.config.coder.preset,
+      type: source.config.type,
+    };
+  }
+  return {
+    template: source.meta?.coder?.template,
+    preset: source.meta?.coder?.preset,
+    type: source.meta?.type,
+  };
+}
+
+/**
+ * A template usable by `cx task`: a statically-declared **task** template
+ * with a static coder template. Persistent templates and purely-dynamic JS
+ * templates (no static `meta`) are excluded.
+ */
+export function isTaskTemplate(source: TemplateSource): boolean {
+  const cfg = staticTaskConfig(source);
+  return Boolean(cfg.template) && cfg.type === "task";
 }
 
 /**
@@ -475,7 +512,7 @@ export async function hasAnyTemplate(opts?: { cwd?: string }): Promise<boolean> 
   return (project?.sources.length ?? 0) > 0;
 }
 
-/** Write `default.json` and `default-ephemeral.json` into the templates dir. */
+/** Write `default.json` and `default-task.json` into the templates dir. */
 export async function seedDefaultTemplates(coderTemplate: string): Promise<void> {
   const baseLayout: LayoutNode = { pane: { surfaces: [{ type: "terminal" }] } };
   await saveTemplate({
@@ -485,15 +522,15 @@ export async function seedDefaultTemplates(coderTemplate: string): Promise<void>
     layout: baseLayout,
   });
   await saveTemplate({
-    name: "default-ephemeral",
+    name: "default-task",
     coder: { template: coderTemplate },
-    type: "ephemeral",
+    type: "task",
     layout: baseLayout,
   });
 }
 
 /**
- * Seed `default` + `default-ephemeral` template files on first run. No-op when
+ * Seed `default` + `default-task` template files on first run. No-op when
  * the user already has any template (global or project-local). Never overwrites
  * or re-seeds — once a user has templates, they own that directory.
  *
@@ -524,7 +561,7 @@ export async function ensureDefaultsSeeded(opts?: {
 
     coderTemplates.sort((a, b) => a.name.localeCompare(b.name));
 
-    p.log.info("No cx templates found — seeding default + default-ephemeral");
+    p.log.info("No cx templates found — seeding default + default-task");
     const choice = await p.autocomplete({
       message: "Select a Coder template to back the defaults",
       options: coderTemplates.map((t) => ({
@@ -587,7 +624,7 @@ export interface MaterializedTemplate {
 export interface PreparedTemplate {
   name: string;
   coder: TemplateConfig["coder"];
-  type: "ephemeral" | "persistent";
+  type: "task" | "persistent";
   color?: string;
   /** True when layout or ports is a function — finalize() requires a WorkspaceContext. */
   needsWorkspace: boolean;

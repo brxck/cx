@@ -16,7 +16,8 @@ import {
 import {
   templateSystemPrompt,
   DEFAULT_TASK_SYSTEM_PROMPT,
-  type TemplateSource,
+  staticTaskConfig,
+  isTaskTemplate,
 } from "../lib/templates.ts";
 import { resolveSourceOrDefault } from "../lib/template-picker.ts";
 
@@ -70,12 +71,23 @@ export const taskCommand = defineCommand({
       forceEditor: args.editor as boolean,
     });
 
-    const { source } = await resolveSourceOrDefault(args.template as string | undefined);
+    const { source } = await resolveSourceOrDefault(args.template as string | undefined, {
+      filter: isTaskTemplate,
+      noun: "task templates",
+    });
 
-    const coder = coderConfig(source);
+    const coder = staticTaskConfig(source);
     if (!coder.template) {
       consola.error(
         `Template ${pc.bold(source.name)} has no static coder template — add a \`coder.template\` (JSON) or \`meta.coder.template\` (JS) so \`cx task\` can target it.`,
+      );
+      process.exit(1);
+    }
+    if (coder.type !== "task") {
+      consola.error(
+        coder.type === "persistent"
+          ? `Template ${pc.bold(source.name)} is persistent — \`cx task\` only supports task templates.`
+          : `Template ${pc.bold(source.name)} has no static \`type: "task"\` — \`cx task\` only supports task templates declared statically (set \`type\` in the JSON config or the JS \`meta\` export).`,
       );
       process.exit(1);
     }
@@ -118,14 +130,6 @@ export const taskCommand = defineCommand({
     p.outro(`${pc.green("✓")} Task created`);
   },
 });
-
-/** Read a cx template's coder config statically (no template fn execution). */
-function coderConfig(source: TemplateSource): { template?: string; preset?: string } {
-  if (source.kind === "json") {
-    return { template: source.config.coder.template, preset: source.config.coder.preset };
-  }
-  return { template: source.meta?.coder?.template, preset: source.meta?.coder?.preset };
-}
 
 async function dashboardUrl(taskId: string): Promise<string | undefined> {
   try {

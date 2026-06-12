@@ -47,7 +47,7 @@ export interface WorkspaceInfo {
 export interface TemplateEntry {
   name: string;
   coder: { template: string };
-  type: "ephemeral" | "persistent";
+  type: "task" | "persistent";
   source: "project" | "global";
 }
 

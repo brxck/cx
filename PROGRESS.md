@@ -7,13 +7,13 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | Command | Status | Notes |
 |---|---|---|
 | `up [workspace]` | Done | Resolves template (project-local or global), creates/starts Coder workspace, builds Cmux layout, starts port forwarding, saves to store with path, generates cmux.json. `--headless`/`-H` starts ZMX sessions without a Cmux layout. |
-| `down [layout]` | Done | Closes Cmux workspace, optionally stops Coder workspace (ephemeral defaults to stop, persistent to keep), removes from store, cleans up cmux.json. Auto-detects layout from cwd. |
+| `down [layout]` | Done | Closes Cmux workspace, optionally stops Coder workspace (task defaults to stop, persistent to keep), removes from store, cleans up cmux.json. Auto-detects layout from cwd. |
 | `status` | Done | Rich dashboard joining store, Coder, Cmux, sidebar state, and port-forward processes. Per-layout boxes with Coder status, Cmux state (headless shown as `⊘ headless`), git branch/dirty, path, template, ports, sessions, Claude status, PR info. Untracked workspaces table. Summary line. `--json` and `--layout` flags. |
 | `list` | Done | Interactive workspace picker with fuzzy filter, SSH and dashboard actions |
 | `ssh [workspace]` | Done | Session name generation (PNW towns), session history, interactive picker |
-| `ports [workspace]` | Done | Unified port-forward management. Workspace-first resolution. Interactive multi-select shows active forwards, presets (annotated `forwarded`/`in use`), template ports as a "Start template ports" action, "Stop all active forwards" action, and a custom mapping prompt. Flags: `--tcp`, `--udp`, `--stop`, `--template` for non-interactive use. All forwards run detached. |
+| `ports [workspace]` | Done | Unified port-forward management. Workspace-first resolution. Interactive multi-select shows active forwards, presets (annotated `forwarded`/`in use`), template ports as a "Start template ports" action, "Stop all active forwards" action, and a custom mapping prompt. Flags: `--tcp`, `--udp`, `--stop`, `--template` for non-interactive use; `--detect` lists listening ports with their Coder subdomain URLs. All forwards run detached. |
 | `exec <workspace> <cmd>` | Done | Runs command via SSH with `--` separator, checks workspace is running |
-| `open [workspace]` | Done | Dynamically lists all workspace apps (Dashboard, VS Code if enabled, plus custom apps from agent config). Interactive picker or `-t` flag. Dashboard and VS Code special-cased; all others delegate to `coder open app`. |
+| `open [workspace]` | Done | Dynamically lists all workspace apps (Dashboard, VS Code if enabled, plus custom apps from agent config) and the workspace's live listening ports. Interactive picker or `-t` flag (`-t 3000` / `-t port:3000`). Ports open through their Coder port subdomain (`{port}--{agent}--{workspace}--{owner}.{host}`) in the browser or a cmux surface. Dashboard and VS Code special-cased; other apps delegate to `coder open app`. |
 | `logs [workspace]` | Done | Streams agent logs with `--follow` (default) and `--build` number |
 | `attach [workspace]` | Done | Picks running Coder workspace, resolves template (or default single-pane), builds Cmux layout, saves to store. Detects headless layouts and re-attaches using stored ZMX session names. |
 | `detach [layout]` | Done | Closes Cmux workspace, removes from store and cmux.json, keeps Coder workspace running. Auto-detects from cwd. |
@@ -36,7 +36,7 @@ Tracks implementation status against [DESIGN.md](./DESIGN.md).
 | SSH config management | Done | Auto-runs `coder config-ssh -y` before layout creation |
 | Background port forwarding | Done | Spawns detached `coder port-forward` process from template port config |
 | Layout state persistence | Done | SQLite store with layouts and sessions tables |
-| Ephemeral vs persistent layout types | Done | Schema, templates, and `down` behavior all wired up |
+| Task vs persistent layout types | Done | Schema, templates, and `down` behavior all wired up |
 | Cmux sidebar integration | Done | `sidebarState()` in cmux.ts, parsed for git branch/dirty, PR, Claude status, ports |
 | Port-forward detection | Done | Shared `src/lib/ports.ts` — `detectPortForwards()`, `detectPortForwardMap()`, `stopPortForwards()` |
 | Headless mode | Done | `up --headless` starts ZMX sessions without Cmux layout; `attach` re-connects to headless sessions; `status` shows `⊘ headless` badge |
