@@ -12,7 +12,7 @@ import {
 } from "./templates.ts";
 import { consola } from "consola";
 import { buildInteractiveSshCommand, sshHost, sshHostWithSession } from "./ssh.ts";
-import { loadConfig } from "./config.ts";
+import { loadConfig, DEFAULT_WORKSPACE_COLOR } from "./config.ts";
 
 export interface BuiltLayout {
   cmuxRef: string;
@@ -38,6 +38,7 @@ export async function buildCmuxLayout(
   layoutName: string,
   template: TemplateConfig,
   coderWsName: string,
+  opts?: { focus?: boolean },
 ): Promise<BuiltLayout> {
   const spinner = p.spinner();
   spinner.start("Building layout");
@@ -49,9 +50,11 @@ export async function buildCmuxLayout(
   const useCmuxSsh = config.cmuxSsh !== false;
   const sshCtx: SshContext = { useCmuxSsh, host };
 
+  // Build off-focus so each split/surface doesn't yank the user to a
+  // half-finished layout; we focus once at the end (see below).
   let wsRef: string;
   if (useCmuxSsh) {
-    wsRef = (await cmux.ssh(host, { name: layoutName })).workspace;
+    wsRef = (await cmux.ssh(host, { name: layoutName, noFocus: true })).workspace;
   } else {
     const initialSession = collectTerminalSurfaces(template.layout)[0]?.session;
     if (initialSession) {
@@ -62,9 +65,10 @@ export async function buildCmuxLayout(
     }
   }
 
-  if (template.color) {
-    await cmux.setWorkspaceColor(wsRef, template.color);
-  }
+  // Every cx workspace gets a color so it's distinguishable in Cmux. A template
+  // color wins, then the user's configured default, then the built-in default.
+  const color = template.color ?? config.defaultColor ?? DEFAULT_WORKSPACE_COLOR;
+  await cmux.setWorkspaceColor(wsRef, color);
 
   // Resolve the initial surface (the single surface of the single pane).
   const panes = await cmux.listPanes(wsRef);
@@ -81,7 +85,30 @@ export async function buildCmuxLayout(
   await walkLayout(template.layout, wsRef, coderWsName, initialSurfRef, sessions, sshCtx);
 
   spinner.stop(`Layout built — ${pc.cyan(wsRef)}`);
+
+  // Now that the layout is fully populated, bring it to focus (unless the
+  // caller is building in the background, e.g. a batch restore).
+  if (opts?.focus !== false) {
+    await focusLayout(wsRef);
+  }
+
   return { cmuxRef: wsRef, sessions };
+}
+
+/**
+ * Bring a freshly built layout to the foreground: select the workspace, raise
+ * its window, and activate the cmux app. Best-effort — selecting is what
+ * matters, so window/app focus failures are ignored.
+ */
+async function focusLayout(wsRef: string): Promise<void> {
+  await cmux.selectWorkspace(wsRef);
+  try {
+    const windowId = await cmux.windowIdForWorkspace(wsRef);
+    if (windowId) await cmux.focusWindow(windowId);
+  } catch {}
+  try {
+    await cmux.activateApp();
+  } catch {}
 }
 
 /**
@@ -225,9 +252,15 @@ async function configureSurfaces(
 ): Promise<void> {
   const surfaces = node.pane.surfaces;
 
-  // newSurface (without --pane) targets the focused pane, so anchor focus here
-  // before iterating.
-  await cmux.focusSurface(wsRef, surfRef);
+  // Resolve the pane that owns the anchor surface so newSurface can target it
+  // explicitly via --pane. Relying on focused-pane targeting would force the
+  // workspace into focus on every pane we configure. Fall back to focusing the
+  // surface if the pane can't be resolved (shouldn't happen in practice).
+  const panes = await cmux.listPanes(wsRef);
+  const paneRef = panes.find((pane) => pane.surface_refs.includes(surfRef))?.ref;
+  if (!paneRef) {
+    await cmux.focusSurface(wsRef, surfRef);
+  }
 
   for (let i = 0; i < surfaces.length; i++) {
     const surface = surfaces[i]!;
@@ -235,6 +268,7 @@ async function configureSurfaces(
     if (surface.type === "browser") {
       await cmux.newSurface({
         workspace: wsRef,
+        pane: paneRef,
         type: "browser",
         url: surface.url,
       });
@@ -247,6 +281,7 @@ async function configureSurfaces(
       if (i > 0) {
         targetSurf = await cmux.newSurface({
           workspace: wsRef,
+          pane: paneRef,
           type: "terminal",
         });
         if (!sshCtx.useCmuxSsh) {

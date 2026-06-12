@@ -5,10 +5,15 @@ import { existsSync, mkdirSync } from "node:fs";
 const CONFIG_DIR = join(homedir(), ".config", "cx");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
+/** Default color applied to every cx-created Cmux workspace, unless overridden. */
+export const DEFAULT_WORKSPACE_COLOR = "#3b82f6";
+
 export interface Config {
   username: string;
   agent?: string;
   cmuxSsh?: boolean;
+  /** Hex color applied to cx-created workspaces. Falls back to DEFAULT_WORKSPACE_COLOR. */
+  defaultColor?: string;
 }
 
 export async function loadConfig(): Promise<Config> {
